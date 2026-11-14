@@ -1,15 +1,17 @@
 -- ============================================================================
--- SCRIPT DE CRIAÇÃO DO BANCO DE DADOS NO SUPABASE
+-- SCRIPT DE CRIAÇÃO DO BANCO DE DADOS NO SUPABASE (VERSÃO ROBUSTA)
 -- Projeto: Gastei & Agora? (Cálculo Financeiro)
--- Copie e cole este código no SQL Editor do seu projeto Supabase e clique em RUN
+-- 
+-- DICA IMPORTANTE: 
+-- Antes de clicar em "RUN", certifique-se de NÃO ter nenhum trecho de texto
+-- selecionado com o mouse, ou use Ctrl+A para selecionar TODO o script.
 -- ============================================================================
 
--- Habilitar extensão de UUID (geralmente já habilitada por padrão)
+-- 1. Habilitar extensão de UUID
 create extension if not exists "uuid-ossp";
 
 -- ============================================================================
--- 1. TABELA DE PERFIS (PROFILES)
--- Complementa a tabela auth.users com dados públicos e preferências visuais
+-- 2. TABELA DE PERFIS (PROFILES)
 -- ============================================================================
 create table if not exists public.profiles (
     id uuid primary key references auth.users(id) on delete cascade,
@@ -21,8 +23,7 @@ create table if not exists public.profiles (
 );
 
 -- ============================================================================
--- 2. TABELA DE REGISTROS FINANCEIROS (FINANCIAL_RECORDS)
--- Salário, tamanho da dívida, deadline e gastos essenciais
+-- 3. TABELA DE REGISTROS FINANCEIROS (FINANCIAL_RECORDS)
 -- ============================================================================
 create table if not exists public.financial_records (
     id uuid primary key default gen_random_uuid(),
@@ -36,8 +37,7 @@ create table if not exists public.financial_records (
 );
 
 -- ============================================================================
--- 3. TABELA DE HISTÓRICO DO CHAT DA IA (CHAT_MESSAGES)
--- Histórico de conversas e diagnósticos com a FinAI
+-- 4. TABELA DE HISTÓRICO DO CHAT DA IA (CHAT_MESSAGES)
 -- ============================================================================
 create table if not exists public.chat_messages (
     id uuid primary key default gen_random_uuid(),
@@ -48,58 +48,46 @@ create table if not exists public.chat_messages (
 );
 
 -- ============================================================================
--- 4. POLÍTICAS DE SEGURANÇA (ROW LEVEL SECURITY - RLS)
--- Garante que cada usuário só acesse e altere seus próprios dados
+-- 5. HABILITAR ROW LEVEL SECURITY (RLS)
 -- ============================================================================
 alter table public.profiles enable row level security;
 alter table public.financial_records enable row level security;
 alter table public.chat_messages enable row level security;
 
--- Políticas para public.profiles
-drop policy if exists "Usuários podem ver seu próprio perfil" on public.profiles;
-create policy "Usuários podem ver seu próprio perfil"
-    on public.profiles for select
-    using (auth.uid() = id);
+-- ============================================================================
+-- 6. POLÍTICAS DE SEGURANÇA (RLS)
+-- Cada instrução inicia com CREATE POLICY em linha única contígua
+-- ============================================================================
 
-drop policy if exists "Usuários podem atualizar seu próprio perfil" on public.profiles;
-create policy "Usuários podem atualizar seu próprio perfil"
-    on public.profiles for update
-    using (auth.uid() = id);
+-- Políticas para Profiles
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own" on public.profiles for select to authenticated using (auth.uid() = id);
 
-drop policy if exists "Usuários podem inserir seu próprio perfil" on public.profiles;
-create policy "Usuários podem inserir seu próprio perfil"
-    on public.profiles for insert
-    with check (auth.uid() = id);
+drop policy if exists "profiles_update_own" on public.profiles;
+create policy "profiles_update_own" on public.profiles for update to authenticated using (auth.uid() = id);
 
--- Políticas para public.financial_records
-drop policy if exists "Usuários podem ver suas próprias finanças" on public.financial_records;
-create policy "Usuários podem ver suas próprias finanças"
-    on public.financial_records for select
-    using (auth.uid() = user_id);
+drop policy if exists "profiles_insert_own" on public.profiles;
+create policy "profiles_insert_own" on public.profiles for insert to authenticated with check (auth.uid() = id);
 
-drop policy if exists "Usuários podem criar suas próprias finanças" on public.financial_records;
-create policy "Usuários podem criar suas próprias finanças"
-    on public.financial_records for insert
-    with check (auth.uid() = user_id);
+-- Políticas para Financial Records
+drop policy if exists "financial_records_select_own" on public.financial_records;
+create policy "financial_records_select_own" on public.financial_records for select to authenticated using (auth.uid() = user_id);
 
-drop policy if exists "Usuários podem atualizar suas próprias finanças" on public.financial_records;
-create policy "Usuários podem atualizar suas próprias finanças"
-    on public.financial_records for update
-    using (auth.uid() = user_id);
+drop policy if exists "financial_records_insert_own" on public.financial_records;
+create policy "financial_records_insert_own" on public.financial_records for insert to authenticated with check (auth.uid() = user_id);
 
--- Políticas para public.chat_messages
-drop policy if exists "Usuários podem ver suas próprias mensagens" on public.chat_messages;
-create policy "Usuários podem ver suas próprias mensagens"
-    on public.chat_messages for select
-    using (auth.uid() = user_id);
+drop policy if exists "financial_records_update_own" on public.financial_records;
+create policy "financial_records_update_own" on public.financial_records for update to authenticated using (auth.uid() = user_id);
 
-drop policy if exists "Usuários podem enviar suas mensagens" on public.chat_messages;
-create policy "Usuários podem enviar suas mensagens"
-    on public.chat_messages for insert
-    with check (auth.uid() = user_id);
+-- Políticas para Chat Messages
+drop policy if exists "chat_messages_select_own" on public.chat_messages;
+create policy "chat_messages_select_own" on public.chat_messages for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "chat_messages_insert_own" on public.chat_messages;
+create policy "chat_messages_insert_own" on public.chat_messages for insert to authenticated with check (auth.uid() = user_id);
 
 -- ============================================================================
--- 5. TRIGGER: CRIAR PERFIL AUTOMATICAMENTE NO CADASTRO DO USUÁRIO
+-- 7. TRIGGER: CRIAR PERFIL AUTOMATICAMENTE NO CADASTRO
 -- ============================================================================
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -110,14 +98,13 @@ begin
         coalesce(new.raw_user_meta_data->>'full_name', 'Guerreiro Financeiro'),
         'dark',
         false
-    );
+    )
+    on conflict (id) do nothing;
     return new;
 end;
 $$ language plpgsql security definer;
 
--- Remove o trigger antigo se existir para evitar duplicação
 drop trigger if exists on_auth_user_created on auth.users;
-
 create trigger on_auth_user_created
     after insert on auth.users
     for each row execute function public.handle_new_user();
