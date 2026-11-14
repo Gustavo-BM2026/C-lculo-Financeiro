@@ -68,7 +68,12 @@ async function setupAuthListener() {
             } else if (event === 'SIGNED_OUT') {
                 currentUser = null;
                 localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-                renderAppForGuest();
+                const dashboard = document.getElementById('dashboardSection');
+                if (dashboard && !dashboard.classList.contains('hidden')) {
+                    window.location.reload();
+                } else {
+                    renderAppForGuest();
+                }
             }
         });
     } else {
@@ -485,7 +490,10 @@ async function handleRegister(e) {
                 // Se auto-confirm estiver ativado, a sessão é iniciada imediatamente
                 registerSuccess.textContent = 'Conta criada com sucesso! Acessando seu painel...';
                 registerSuccess.classList.remove('hidden');
-                // O listener onAuthStateChange('SIGNED_IN') cuidará da transição da UI
+                setTimeout(() => {
+                    closeAuthModal();
+                    window.location.reload();
+                }, 500);
                 return;
             }
         }
@@ -516,7 +524,8 @@ async function handleRegister(e) {
 
         setTimeout(() => {
             setSessionUser(newUser);
-        }, 750);
+            window.location.reload();
+        }, 600);
     } catch (err) {
         registerError.textContent = 'Falha ao processar cadastro: ' + err.message;
         registerError.classList.remove('hidden');
@@ -577,8 +586,8 @@ async function handleLogin(e) {
             }
 
             if (data?.session) {
-                // O listener onAuthStateChange('SIGNED_IN') cuidará do carregamento do perfil e renderização
                 closeAuthModal();
+                window.location.reload();
                 return;
             }
         }
@@ -594,6 +603,7 @@ async function handleLogin(e) {
         }
 
         setSessionUser(user);
+        window.location.reload();
     } catch (err) {
         loginError.textContent = 'Falha de comunicação: ' + err.message;
         loginError.classList.remove('hidden');
@@ -621,7 +631,8 @@ async function handleLogout() {
     }
     currentUser = null;
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-    renderAppForGuest();
+    // Recarrega a página automaticamente para deslogar e resetar totalmente os dados
+    window.location.reload();
 }
 
 document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
@@ -699,6 +710,17 @@ function renderAppForGuest() {
     if (dashboard) dashboard.classList.add('hidden');
     if (userPill) userPill.classList.add('hidden');
     if (loginNavBtn) loginNavBtn.classList.remove('hidden');
+
+    // Reseta todos os dados e inputs para evitar qualquer resquício
+    currentFinanceData = { salary: 0, debt: 0, deadline: '', essentials: 0 };
+    const monthlySalary = document.getElementById('monthlySalary');
+    const totalDebt = document.getElementById('totalDebt');
+    const debtDeadline = document.getElementById('debtDeadline');
+    const essentialExpenses = document.getElementById('essentialExpenses');
+    if (monthlySalary) monthlySalary.value = '';
+    if (totalDebt) totalDebt.value = '';
+    if (debtDeadline) debtDeadline.value = '';
+    if (essentialExpenses) essentialExpenses.value = '';
 }
 
 /* ============================================================================
@@ -754,18 +776,36 @@ async function loadUserFinanceData() {
                 document.getElementById('debtDeadline').value = currentFinanceData.deadline || '';
                 document.getElementById('essentialExpenses').value = currentFinanceData.essentials || '';
                 calculateAndRenderMetrics();
+                loaded = true;
             } catch (e) {
                 console.error('Erro ao ler finanças do LocalStorage:', e);
             }
-        } else {
-            // Preenche com uma deadline padrão (ex: daqui a 6 meses) para guiar o usuário
-            const defaultDeadline = new Date();
-            defaultDeadline.setMonth(defaultDeadline.getMonth() + 6);
-            const yyyy = defaultDeadline.getFullYear();
-            const mm = String(defaultDeadline.getMonth() + 1).padStart(2, '0');
-            const dd = String(defaultDeadline.getDate()).padStart(2, '0');
-            document.getElementById('debtDeadline').value = `${yyyy}-${mm}-${dd}`;
         }
+    }
+
+    // 3. Se for um usuário novo (sem dados salvos no Supabase nem no LocalStorage), reseta todos os campos
+    if (!loaded) {
+        currentFinanceData = {
+            salary: 0,
+            debt: 0,
+            deadline: '',
+            essentials: 0
+        };
+        document.getElementById('monthlySalary').value = '';
+        document.getElementById('totalDebt').value = '';
+        document.getElementById('essentialExpenses').value = '';
+
+        // Preenche com uma deadline padrão (ex: daqui a 6 meses) para guiar o usuário
+        const defaultDeadline = new Date();
+        defaultDeadline.setMonth(defaultDeadline.getMonth() + 6);
+        const yyyy = defaultDeadline.getFullYear();
+        const mm = String(defaultDeadline.getMonth() + 1).padStart(2, '0');
+        const dd = String(defaultDeadline.getDate()).padStart(2, '0');
+        const defaultDeadlineStr = `${yyyy}-${mm}-${dd}`;
+        document.getElementById('debtDeadline').value = defaultDeadlineStr;
+        currentFinanceData.deadline = defaultDeadlineStr;
+
+        calculateAndRenderMetrics();
     }
 
     // Inicializa o calendário com notas e deadline do usuário
