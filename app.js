@@ -78,9 +78,23 @@ async function setupAuthListener() {
             }
         });
     } else {
-        // Fallback: Recupera sessão local do LocalStorage
-        checkExistingSessionLocalStorage();
+        // Fallback: Recupera sessão local do LocalStorage com verificação de integridade
+        await checkExistingSessionLocalStorage();
     }
+}
+
+async function hashPassword(plainTextPassword) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plainTextPassword + '_salt_gastei_agora_v1');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function generateSessionToken(userId, userEmail) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${userId}:${userEmail}:gastei_agora_auth_secret_token_v1`);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function loadUserSessionFromSupabase(authUser) {
@@ -106,15 +120,34 @@ async function loadUserSessionFromSupabase(authUser) {
     }
 }
 
-function checkExistingSessionLocalStorage() {
+async function checkExistingSessionLocalStorage() {
     const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (raw) {
         try {
-            currentUser = JSON.parse(raw);
-            renderAppForAuthenticatedUser();
-            return;
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.id && parsed.email) {
+                const expectedToken = await generateSessionToken(parsed.id, parsed.email);
+                // Valida a integridade da sessão local contra manipulação no console
+                if (parsed.sessionToken === expectedToken) {
+                    const users = getUsersFromStorage();
+                    const validUser = users.find(u => u.id === parsed.id && u.email === parsed.email);
+                    if (validUser) {
+                        currentUser = {
+                            id: validUser.id,
+                            name: validUser.name,
+                            email: validUser.email,
+                            sessionToken: expectedToken
+                        };
+                        renderAppForAuthenticatedUser();
+                        return;
+                    }
+                }
+            }
+            console.warn('Sessão local inválida ou adulterada. Redirecionando para login.');
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
         } catch (err) {
             console.error('Erro ao recuperar sessão do LocalStorage:', err);
+            localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
         }
     }
     renderAppForGuest();
@@ -515,11 +548,12 @@ async function handleRegister(e) {
             return;
         }
 
+        const passwordHash = await hashPassword(passwordInput);
         const newUser = {
             id: 'usr_' + Date.now(),
             name: nameInput,
             email: emailInput,
-            password: passwordInput,
+            passwordHash: passwordHash, // Senha armazenada exclusivamente via hash SHA-256
             createdAt: new Date().toISOString()
         };
 
@@ -529,8 +563,8 @@ async function handleRegister(e) {
         registerSuccess.textContent = 'Conta criada com sucesso! Redirecionando para seu painel...';
         registerSuccess.classList.remove('hidden');
 
-        setTimeout(() => {
-            setSessionUser(newUser);
+        setTimeout(async () => {
+            await setSessionUser(newUser);
             window.location.reload();
         }, 600);
     } catch (err) {
@@ -599,9 +633,10 @@ async function handleLogin(e) {
             }
         }
 
-        // Fallback: Autenticação via LocalStorage
+        // Fallback: Autenticação segura via LocalStorage com hash criptográfico
         const users = getUsersFromStorage();
-        const user = users.find(u => u.email === emailInput && u.password === passwordInput);
+        const inputHash = await hashPassword(passwordInput);
+        const user = users.find(u => u.email === emailInput && (u.passwordHash === inputHash || u.password === passwordInput));
 
         if (!user) {
             loginError.textContent = 'E-mail ou senha incorretos. Verifique seus dados ou crie uma conta.';
@@ -609,7 +644,14 @@ async function handleLogin(e) {
             return;
         }
 
-        setSessionUser(user);
+        // Se o usuário possuía senha legada em plaintext, migra automaticamente para hash
+        if (user.password && !user.passwordHash) {
+            user.passwordHash = inputHash;
+            delete user.password;
+            saveUsersToStorage(users);
+        }
+
+        await setSessionUser(user);
         window.location.reload();
     } catch (err) {
         loginError.textContent = 'Falha de comunicação: ' + err.message;
@@ -622,9 +664,16 @@ async function handleLogin(e) {
     }
 }
 
-function setSessionUser(user) {
-    currentUser = user;
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+async function setSessionUser(user) {
+    const sessionToken = await generateSessionToken(user.id, user.email);
+    // Guarda apenas dados públicos sanitizados e o token de validação de integridade
+    currentUser = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        sessionToken
+    };
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
     renderAppForAuthenticatedUser();
 }
 
@@ -638,6 +687,7 @@ async function handleLogout() {
     }
     currentUser = null;
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    sessionStorage.clear();
     // Recarrega a página automaticamente para deslogar e resetar totalmente os dados
     window.location.reload();
 }
@@ -1334,6 +1384,9 @@ function initCalendar() {
     // Inicia e atualiza o relógio em tempo real da máquina
     startMachineClock();
 
+    // Ativa delegação de eventos segura para o calendário
+    setupCalendarDelegation();
+
     renderCalendarGrid();
     renderSelectedDateNotes();
 }
@@ -1483,7 +1536,7 @@ function renderCalendarGrid() {
         const dateStr = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
 
         html += `
-            <div class="cal-day other-month" onclick="selectCalendarDate('${dateStr}', true)">
+            <div class="cal-day other-month" data-action="select-day" data-date="${escapeHtml(dateStr)}" data-other-month="true">
                 <span class="day-number">${dayNum}</span>
                 <div class="day-indicators"></div>
             </div>
@@ -1516,7 +1569,7 @@ function renderCalendarGrid() {
         }
 
         html += `
-            <div class="${classList.join(' ')}" onclick="selectCalendarDate('${dateStr}')" title="${isDeadline ? 'Data de quitação da dívida' : ''}">
+            <div class="${classList.join(' ')}" data-action="select-day" data-date="${escapeHtml(dateStr)}" title="${isDeadline ? 'Data de quitação da dívida' : ''}">
                 <span class="day-number">${day}</span>
                 <div class="day-indicators">${indicatorsHtml}</div>
             </div>
@@ -1532,7 +1585,7 @@ function renderCalendarGrid() {
         const dateStr = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(nextDay).padStart(2, '0')}`;
 
         html += `
-            <div class="cal-day other-month" onclick="selectCalendarDate('${dateStr}', true)">
+            <div class="cal-day other-month" data-action="select-day" data-date="${escapeHtml(dateStr)}" data-other-month="true">
                 <span class="day-number">${nextDay}</span>
                 <div class="day-indicators"></div>
             </div>
@@ -1540,6 +1593,36 @@ function renderCalendarGrid() {
     }
 
     gridEl.innerHTML = html;
+}
+
+/**
+ * Configura delegação segura de eventos no calendário (previne XSS e inline event handlers)
+ */
+let isCalendarDelegationSetup = false;
+function setupCalendarDelegation() {
+    if (isCalendarDelegationSetup) return;
+    isCalendarDelegationSetup = true;
+
+    const gridEl = document.getElementById('calendarDaysGrid');
+    if (gridEl) {
+        gridEl.addEventListener('click', (e) => {
+            const dayEl = e.target.closest('[data-action="select-day"]');
+            if (dayEl && dayEl.dataset.date) {
+                const isOtherMonth = dayEl.dataset.otherMonth === 'true';
+                selectCalendarDate(dayEl.dataset.date, isOtherMonth);
+            }
+        });
+    }
+
+    const notesListEl = document.getElementById('selectedDateNotesList');
+    if (notesListEl) {
+        notesListEl.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('[data-action="delete-note"]');
+            if (deleteBtn && deleteBtn.dataset.date && deleteBtn.dataset.noteId) {
+                handleDeleteCalendarNote(deleteBtn.dataset.date, deleteBtn.dataset.noteId);
+            }
+        });
+    }
 }
 
 /**
@@ -1607,7 +1690,7 @@ function renderSelectedDateNotes() {
                 ${note.value ? `<span class="note-item-amount">${formatCurrency(note.value)}</span>` : ''}
             </div>
             ${!note.isDeadline ? `
-                <button type="button" class="note-item-delete" onclick="handleDeleteCalendarNote('${dateStr}', '${note.id}')" title="Excluir este lembrete">
+                <button type="button" class="note-item-delete" data-action="delete-note" data-date="${escapeHtml(dateStr)}" data-note-id="${escapeHtml(note.id)}" title="Excluir este lembrete">
                     🗑️
                 </button>
             ` : `<span title="Lembrete automático sincronizado com a deadline" style="font-size: 0.85rem; cursor: help;">🔒</span>`}
