@@ -267,6 +267,19 @@ body.privacy-mode .metric-box {
     cursor: pointer;
 }
 
+/* Nav Login Button */
+.nav-login-btn {
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    gap: 0.4rem;
+}
+
+.nav-login-icon {
+    font-size: 0.95rem;
+}
+
 /* User Session Pill */
 .user-pill {
     display: flex;
@@ -319,52 +332,288 @@ body.privacy-mode .metric-box {
 }
 
 /* ==========================================================================
-   WELCOME BANNER
+   LANDING PAGE (Página Inicial: Contexto e O Que o Site Pode Fazer)
    ========================================================================== */
-.welcome-banner {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(56, 189, 248, 0.08));
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    position: relative;
-    overflow: hidden;
+.home-landing-section {
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+    animation: fadeIn 0.4s ease;
 }
 
-.welcome-banner::before {
+/* Hero Principal */
+.landing-hero {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(56, 189, 248, 0.08));
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 3rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.landing-hero::before {
     content: '';
     position: absolute;
-    top: -50px;
-    right: -50px;
-    width: 200px;
-    height: 200px;
+    top: -100px;
+    right: -100px;
+    width: 300px;
+    height: 300px;
     background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
     pointer-events: none;
 }
 
-.badge-humor {
+.hero-badge {
     display: inline-block;
     background-color: var(--color-warning-bg);
     color: var(--color-warning);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    padding: 0.35rem 0.8rem;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    padding: 0.4rem 1rem;
     border-radius: 9999px;
     font-size: 0.85rem;
     font-weight: 700;
-    margin-bottom: 0.85rem;
+    margin-bottom: 1.25rem;
+    letter-spacing: 0.02em;
 }
 
-.welcome-content h2 {
-    font-size: 1.85rem;
+.hero-title {
+    font-size: clamp(1.85rem, 4vw, 2.75rem);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.15rem;
+    max-width: 900px;
+    background: linear-gradient(135deg, var(--text-primary), var(--accent-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero-description {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    max-width: 820px;
+    line-height: 1.7;
+    margin-bottom: 2rem;
+}
+
+.hero-cta-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-lg {
+    padding: 0.95rem 1.75rem;
+    font-size: 1.05rem;
+    border-radius: var(--border-radius-md);
+}
+
+/* Seção de Recursos (O que o site pode fazer por você) */
+.section-heading {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.subheading-tag {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--accent-color);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+}
+
+.section-heading h3 {
+    font-size: clamp(1.5rem, 3vw, 2rem);
     font-weight: 800;
     letter-spacing: -0.02em;
-    margin-bottom: 0.65rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.section-heading p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    max-width: 620px;
+    margin: 0 auto;
+}
+
+.capabilities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+}
+
+.capability-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 1.75rem;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.capability-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-color);
+    box-shadow: var(--card-shadow-hover);
+}
+
+.capability-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--border-radius-md);
+    background: var(--bg-card-secondary);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.capability-card h4 {
+    font-size: 1.15rem;
+    font-weight: 700;
     color: var(--text-primary);
 }
 
-.welcome-content p {
+.capability-card p {
+    font-size: 0.9rem;
     color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+/* Como funciona em 3 passos */
+.landing-steps {
+    background-color: var(--bg-card-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 2.5rem 2rem;
+}
+
+.steps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.step-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    position: relative;
+}
+
+.step-number {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+    color: #ffffff;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.step-card h4 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.step-card p {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.steps-cta-bottom {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* ==========================================================================
+   MODAL DE AUTENTICAÇÃO
+   ========================================================================== */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(3, 7, 18, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow-y: auto;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-container {
+    position: relative;
+    max-width: 480px;
+    width: 100%;
+    margin: auto;
+    animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-auth-card {
+    width: 100%;
+    border-color: var(--border-color);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--accent-glow);
+}
+
+.btn-close-modal {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: var(--bg-card-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
     font-size: 1rem;
-    max-width: 800px;
+    font-weight: 700;
+    z-index: 10;
+    transition: var(--transition);
+}
+
+.btn-close-modal:hover {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+    background-color: var(--color-danger-bg);
+    transform: rotate(90deg);
 }
 
 /* ==========================================================================
@@ -1213,23 +1462,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     .main-wrapper {
         padding: 1.25rem 1rem;
-        gap: 1.25rem;
+        gap: 1.5rem;
     }
 
-    .welcome-banner {
-        padding: 1.5rem 1.25rem;
-    }
-
-    .welcome-content h2 {
-        font-size: 1.45rem;
+    .landing-hero {
+        padding: 2.25rem 1.5rem;
     }
 
     .card {
         padding: 1.5rem 1.25rem;
-    }
-
-    .auth-card {
-        padding: 1.75rem 1.25rem;
     }
 
     .ai-header {
@@ -1252,11 +1493,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 
     .brand-icon {
-        font-size: 1.6rem;
+        font-size: 1.5rem;
     }
 
     .brand-text h1 {
-        font-size: 1.05rem;
+        font-size: 1rem;
     }
 
     .brand-tagline {
@@ -1264,7 +1505,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 
     .nav-actions {
-        gap: 0.45rem;
+        gap: 0.4rem;
     }
 
     /* Em telas muito estreitas, oculta o texto dos botões mantendo os ícones para economizar espaço */
@@ -1278,6 +1519,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         display: none;
     }
 
+    .nav-login-btn {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.78rem;
+    }
+
     .user-pill {
         padding: 0.35rem 0.55rem;
         font-size: 0.8rem;
@@ -1287,32 +1533,51 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         max-width: 80px;
     }
 
-    .welcome-banner {
-        padding: 1.2rem 1rem;
+    /* Landing Page em Mobile */
+    .landing-hero {
+        padding: 1.75rem 1rem;
         border-radius: var(--border-radius-md);
     }
 
-    .welcome-content h2 {
-        font-size: 1.25rem;
+    .hero-title {
+        font-size: 1.45rem;
     }
 
-    .welcome-content p {
-        font-size: 0.9rem;
+    .hero-description {
+        font-size: 0.92rem;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
     }
 
-    .badge-humor {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.65rem;
+    .hero-cta-group {
+        width: 100%;
+        flex-direction: column;
     }
 
-    .auth-card-wrapper {
-        margin: 0;
+    .hero-cta-group .btn {
         width: 100%;
     }
 
-    .auth-card {
-        padding: 1.25rem 0.85rem;
-        border-radius: var(--border-radius-md);
+    .capabilities-grid,
+    .steps-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .capability-card {
+        padding: 1.25rem 1rem;
+    }
+
+    .landing-steps {
+        padding: 1.75rem 1rem;
+    }
+
+    .modal-backdrop {
+        padding: 0.5rem;
+    }
+
+    .modal-container {
+        max-width: 100%;
     }
 
     .card {

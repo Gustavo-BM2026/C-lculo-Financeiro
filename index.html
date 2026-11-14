@@ -43,7 +43,13 @@
                     <span class="privacy-text">Ocultar Valores</span>
                 </button>
 
-                <!-- User Session Pill -->
+                <!-- Botão de Login / Cadastro (Ao lado do tema, visível quando deslogado) -->
+                <button id="loginNavBtn" class="btn btn-primary btn-sm nav-login-btn" onclick="openAuthModal('login')" title="Entrar ou criar uma conta">
+                    <span class="nav-login-icon">🔑</span>
+                    <span class="nav-login-text">Entrar / Cadastrar</span>
+                </button>
+
+                <!-- User Session Pill (Visível quando logado) -->
                 <div id="userPill" class="user-pill hidden">
                     <span class="avatar-icon">👤</span>
                     <span id="userNameDisplay" class="user-name">Usuário</span>
@@ -56,115 +62,212 @@
     <!-- Main Container -->
     <main class="main-wrapper">
 
-        <!-- SECTION: Boas-vindas / Apresentação -->
-        <section class="welcome-banner">
-            <div class="welcome-content">
-                <div class="badge-humor">😅 "Gastou no impulso? Calma, a gente resolve junto!"</div>
-                <h2>Olá, amigo consumista! Vamos colocar essa dívida nos trilhos?</h2>
-                <p>
-                    Sabemos como é: uma comprinha ali, um parcelamento acolá e, de repente, o estrago está feito. 
-                    Sem pânico! O primeiro passo para sair do vermelho é saber exatamente o tamanho do monstro 
-                    e traçar uma data limite (<em>deadline</em>) com ajuda da nossa <strong>IA Financeira</strong>.
+        <!-- SECTION: Página Inicial / Apresentação e Contexto (Visível para visitantes) -->
+        <section id="homeLandingSection" class="home-landing-section">
+            
+            <!-- Hero Principal com Contexto -->
+            <div class="landing-hero">
+                <div class="hero-badge">✨ Sua bússola para sair do vermelho</div>
+                <h2 class="hero-title">Gastou mais do que devia e perdeu o controle da dívida?</h2>
+                <p class="hero-description">
+                    Não se culpe: compras por impulso, faturas de cartão acumuladas e falta de planejamento acontecem com quase todo mundo. 
+                    O <strong>Gastei & Agora?</strong> foi criado especialmente para você que precisa encarar o tamanho da sua dívida, 
+                    estabelecer uma data limite (<em>deadline</em>) no calendário e seguir um plano matemático real com auxílio da nossa <strong>IA Financeira</strong>.
                 </p>
+                
+                <div class="hero-cta-group">
+                    <button class="btn btn-primary btn-lg" onclick="openAuthModal('register')">
+                        <span>🚀 Começar Agora (Criar Conta Grátis)</span>
+                    </button>
+                    <button class="btn btn-outline btn-lg" onclick="openAuthModal('login')">
+                        <span>🔑 Já tenho conta (Entrar)</span>
+                    </button>
+                </div>
             </div>
-        </section>
 
-        <!-- SECTION: Autenticação (Login / Cadastro) -->
-        <section id="authSection" class="auth-card-wrapper">
-            <div class="card auth-card">
-                <div class="auth-tabs">
-                    <button id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">Entrar</button>
-                    <button id="tabRegister" class="tab-btn" onclick="switchAuthTab('register')">Criar Conta</button>
+            <!-- O Que o Site Pode Fazer Por Você -->
+            <div class="landing-capabilities">
+                <div class="section-heading">
+                    <span class="subheading-tag">Recursos Poderosos</span>
+                    <h3>O que o site pode fazer por você?</h3>
+                    <p>Ferramentas práticas e intuitivas projetadas para quem precisa de clareza imediata e disciplina financeira.</p>
                 </div>
 
-                <!-- Formulário de Login -->
-                <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
-                    <div class="form-header">
-                        <h3>Bem-vindo de volta!</h3>
-                        <p>Entre para continuar gerenciando sua dívida e recebendo auxílio da IA.</p>
-                    </div>
+                <div class="capabilities-grid">
                     
-                    <div class="form-group">
-                        <label for="loginEmail">E-mail</label>
-                        <input type="email" id="loginEmail" placeholder="ex: usuario@outlook.com" required autocomplete="email">
-                        <small class="field-hint">Deve incluir o @ e o provedor (ex: @outlook.com, @gmail.com)</small>
+                    <div class="capability-card">
+                        <div class="capability-icon">📊</div>
+                        <h4>Diagnóstico & Metas Claras</h4>
+                        <p>Informe quanto você ganha e o total devido. O sistema divide a dívida pelo seu tempo disponível e calcula exatamente quanto economizar por dia e por mês.</p>
                     </div>
 
-                    <div class="form-group">
-                        <label for="loginPassword">Senha</label>
-                        <div class="password-input-wrapper">
-                            <input type="password" id="loginPassword" placeholder="Sua senha cadastrada" required autocomplete="current-password">
-                            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
-                        </div>
+                    <div class="capability-card">
+                        <div class="capability-icon">📅</div>
+                        <h4>Calendário com "Deadline"</h4>
+                        <p>Escolha no calendário a data final em que você quer estar livre de contas. O sistema avalia se a meta é saudável ou se a parcela vai sufocar seu salário.</p>
                     </div>
 
-                    <div id="loginError" class="alert-msg error hidden"></div>
-
-                    <button type="submit" class="btn btn-primary btn-block">Acessar Meu Painel</button>
-                    <p class="auth-switch-hint">Não tem conta ainda? <a href="#" onclick="switchAuthTab('register'); return false;">Cadastre-se grátis</a></p>
-                </form>
-
-                <!-- Formulário de Cadastro -->
-                <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
-                    <div class="form-header">
-                        <h3>Crie sua conta</h3>
-                        <p>Leva menos de 1 minuto e seus dados ficam salvos com segurança.</p>
+                    <div class="capability-card">
+                        <div class="capability-icon">🤖</div>
+                        <h4>FinAI - Mentora Inteligente</h4>
+                        <p>Uma Inteligência Artificial que analisa seu grau de risco, ensina técnicas anti-impulso (como a regra das 72h) e explica métodos como Bola de Neve e Avalanche.</p>
                     </div>
 
-                    <div class="form-group">
-                        <label for="regName">Seu Nome ou Apelido</label>
-                        <input type="text" id="regName" placeholder="Como quer ser chamado?" required autocomplete="name">
+                    <div class="capability-card">
+                        <div class="capability-icon">👁️</div>
+                        <h4>Modo Privacidade com Hover</h4>
+                        <p>Ative o modo privacidade para censurar seus números com efeito desfoque (*blur*). Basta passar o mouse por cima do valor para revelá-lo temporariamente.</p>
                     </div>
 
-                    <div class="form-group">
-                        <label for="regEmail">E-mail com Provedor</label>
-                        <input type="email" id="regEmail" placeholder="ex: seuemail@outlook.com" required autocomplete="email">
-                        <small class="field-hint">Obrigatório conter '@' e o provedor (ex: outlook.com, gmail.com, etc.)</small>
+                    <div class="capability-card">
+                        <div class="capability-icon">🌓</div>
+                        <h4>Tema Azul Escuro & Claro</h4>
+                        <p>Ambiente padrão em azul escuro elegante, moderno e confortável para a visão, com opção de alternar para modo claro a qualquer momento em 1 clique.</p>
                     </div>
 
-                    <div class="form-group">
-                        <label for="regPassword">Crie uma Senha Forte</label>
-                        <div class="password-input-wrapper">
-                            <input type="password" id="regPassword" placeholder="Digite sua senha" required autocomplete="new-password" oninput="checkPasswordRequirements(this.value)">
-                            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('regPassword', this)" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
-                        </div>
-
-                        <!-- Requisitos Visuais de Senha -->
-                        <div class="password-requirements" id="passwordRequirements">
-                            <span class="req-title">A senha deve conter:</span>
-                            <ul class="req-list">
-                                <li id="reqLength" class="req-item invalid">
-                                    <span class="req-icon">✕</span>
-                                    <span>Pelo menos 6 caracteres</span>
-                                </li>
-                                <li id="reqUpper" class="req-item invalid">
-                                    <span class="req-icon">✕</span>
-                                    <span>Uma letra maiúscula (A-Z)</span>
-                                </li>
-                                <li id="reqLower" class="req-item invalid">
-                                    <span class="req-icon">✕</span>
-                                    <span>Uma letra minúscula (a-z)</span>
-                                </li>
-                                <li id="reqNumber" class="req-item invalid">
-                                    <span class="req-icon">✕</span>
-                                    <span>Pelo menos um número (0-9)</span>
-                                </li>
-                                <li id="reqSpecial" class="req-item invalid">
-                                    <span class="req-icon">✕</span>
-                                    <span>Pelo menos um caractere especial (!@#$%...)</span>
-                                </li>
-                            </ul>
-                        </div>
+                    <div class="capability-card">
+                        <div class="capability-icon">☁️</div>
+                        <h4>Nuvem Supabase ou Offline</h4>
+                        <p>Funciona imediatamente no seu computador ou celular via armazenamento local, ou sincroniza na nuvem com o banco de dados seguro do Supabase.</p>
                     </div>
 
-                    <div id="registerError" class="alert-msg error hidden"></div>
-                    <div id="registerSuccess" class="alert-msg success hidden"></div>
-
-                    <button type="submit" class="btn btn-primary btn-block">Criar Conta & Começar</button>
-                    <p class="auth-switch-hint">Já possui uma conta? <a href="#" onclick="switchAuthTab('login'); return false;">Faça login</a></p>
-                </form>
+                </div>
             </div>
+
+            <!-- Como Funciona em 3 Passos -->
+            <div class="landing-steps">
+                <div class="section-heading">
+                    <span class="subheading-tag">Simples e Direto</span>
+                    <h3>Como funciona em 3 passos</h3>
+                </div>
+
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <h4>Crie sua Conta</h4>
+                        <p>Cadastre-se com e-mail e senha forte em menos de 1 minuto para manter seu histórico seguro.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <h4>Preencha seus Dados</h4>
+                        <p>Insira seu salário líquido mensal, sua dívida acumulada e escolha a data no calendário.</p>
+                    </div>
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <h4>Conquiste a Quitação</h4>
+                        <p>Veja suas parcelas diárias e mensais, receba o diagnóstico da FinAI e elimine suas pendências.</p>
+                    </div>
+                </div>
+
+                <div class="steps-cta-bottom">
+                    <button class="btn btn-primary" onclick="openAuthModal('register')">
+                        <span>Quero Organizar Minhas Dívidas Agora ➤</span>
+                    </button>
+                </div>
+            </div>
+
         </section>
+
+        <!-- MODAL: Autenticação (Login / Cadastro) -->
+        <div id="authModal" class="modal-backdrop hidden" onclick="handleBackdropClick(event)">
+            <div class="modal-container">
+                <button class="btn-close-modal" onclick="closeAuthModal()" aria-label="Fechar janela" title="Fechar">✕</button>
+                
+                <div class="card auth-card modal-auth-card">
+                    <div class="auth-tabs">
+                        <button id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">Entrar</button>
+                        <button id="tabRegister" class="tab-btn" onclick="switchAuthTab('register')">Criar Conta</button>
+                    </div>
+
+                    <!-- Formulário de Login -->
+                    <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+                        <div class="form-header">
+                            <h3>Bem-vindo de volta!</h3>
+                            <p>Entre para continuar gerenciando sua dívida e recebendo auxílio da IA.</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="loginEmail">E-mail</label>
+                            <input type="email" id="loginEmail" placeholder="ex: usuario@outlook.com" required autocomplete="email">
+                            <small class="field-hint">Deve incluir o @ e o provedor (ex: @outlook.com, @gmail.com)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loginPassword">Senha</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="loginPassword" placeholder="Sua senha cadastrada" required autocomplete="current-password">
+                                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+                            </div>
+                        </div>
+
+                        <div id="loginError" class="alert-msg error hidden"></div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Acessar Meu Painel</button>
+                        <p class="auth-switch-hint">Não tem conta ainda? <a href="#" onclick="switchAuthTab('register'); return false;">Cadastre-se grátis</a></p>
+                    </form>
+
+                    <!-- Formulário de Cadastro -->
+                    <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
+                        <div class="form-header">
+                            <h3>Crie sua conta</h3>
+                            <p>Leva menos de 1 minuto e seus dados ficam salvos com segurança.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="regName">Seu Nome ou Apelido</label>
+                            <input type="text" id="regName" placeholder="Como quer ser chamado?" required autocomplete="name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="regEmail">E-mail com Provedor</label>
+                            <input type="email" id="regEmail" placeholder="ex: seuemail@outlook.com" required autocomplete="email">
+                            <small class="field-hint">Obrigatório conter '@' e o provedor (ex: outlook.com, gmail.com, etc.)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="regPassword">Crie uma Senha Forte</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="regPassword" placeholder="Digite sua senha" required autocomplete="new-password" oninput="checkPasswordRequirements(this.value)">
+                                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('regPassword', this)" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+                            </div>
+
+                            <!-- Requisitos Visuais de Senha -->
+                            <div class="password-requirements" id="passwordRequirements">
+                                <span class="req-title">A senha deve conter:</span>
+                                <ul class="req-list">
+                                    <li id="reqLength" class="req-item invalid">
+                                        <span class="req-icon">✕</span>
+                                        <span>Pelo menos 6 caracteres</span>
+                                    </li>
+                                    <li id="reqUpper" class="req-item invalid">
+                                        <span class="req-icon">✕</span>
+                                        <span>Uma letra maiúscula (A-Z)</span>
+                                    </li>
+                                    <li id="reqLower" class="req-item invalid">
+                                        <span class="req-icon">✕</span>
+                                        <span>Uma letra minúscula (a-z)</span>
+                                    </li>
+                                    <li id="reqNumber" class="req-item invalid">
+                                        <span class="req-icon">✕</span>
+                                        <span>Pelo menos um número (0-9)</span>
+                                    </li>
+                                    <li id="reqSpecial" class="req-item invalid">
+                                        <span class="req-icon">✕</span>
+                                        <span>Pelo menos um caractere especial (!@#$%...)</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div id="registerError" class="alert-msg error hidden"></div>
+                        <div id="registerSuccess" class="alert-msg success hidden"></div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Criar Conta & Começar</button>
+                        <p class="auth-switch-hint">Já possui uma conta? <a href="#" onclick="switchAuthTab('login'); return false;">Faça login</a></p>
+                    </form>
+                </div>
+            </div>
+        </div>
 
         <!-- SECTION: Painel Principal da Planilha e Gestão (Visível após login) -->
         <section id="dashboardSection" class="dashboard-section hidden">

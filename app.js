@@ -572,10 +572,57 @@ async function handleLogout() {
 
 document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
 
+/**
+ * ============================================================================
+ * MODAL DE AUTENTICAÇÃO (LOGIN / CADASTRO)
+ * ============================================================================
+ */
+function openAuthModal(tab = 'login') {
+    const modal = document.getElementById('authModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        switchAuthTab(tab);
+        setTimeout(() => {
+            if (tab === 'login') {
+                document.getElementById('loginEmail')?.focus();
+            } else {
+                document.getElementById('regName')?.focus();
+            }
+        }, 80);
+    }
+}
+
+function closeAuthModal() {
+    const modal = document.getElementById('authModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+function handleBackdropClick(event) {
+    if (event.target.id === 'authModal') {
+        closeAuthModal();
+    }
+}
+
+// Fechar com tecla ESC
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeAuthModal();
+    }
+});
+
 function renderAppForAuthenticatedUser() {
-    document.getElementById('authSection').classList.add('hidden');
-    document.getElementById('dashboardSection').classList.remove('hidden');
-    document.getElementById('userPill').classList.remove('hidden');
+    closeAuthModal();
+    const landing = document.getElementById('homeLandingSection');
+    const dashboard = document.getElementById('dashboardSection');
+    const userPill = document.getElementById('userPill');
+    const loginNavBtn = document.getElementById('loginNavBtn');
+
+    if (landing) landing.classList.add('hidden');
+    if (dashboard) dashboard.classList.remove('hidden');
+    if (userPill) userPill.classList.remove('hidden');
+    if (loginNavBtn) loginNavBtn.classList.add('hidden');
 
     const nameDisplay = document.getElementById('userNameDisplay');
     const salutationName = document.getElementById('salutationName');
@@ -588,9 +635,16 @@ function renderAppForAuthenticatedUser() {
 }
 
 function renderAppForGuest() {
-    document.getElementById('authSection').classList.remove('hidden');
-    document.getElementById('dashboardSection').classList.add('hidden');
-    document.getElementById('userPill').classList.add('hidden');
+    closeAuthModal();
+    const landing = document.getElementById('homeLandingSection');
+    const dashboard = document.getElementById('dashboardSection');
+    const userPill = document.getElementById('userPill');
+    const loginNavBtn = document.getElementById('loginNavBtn');
+
+    if (landing) landing.classList.remove('hidden');
+    if (dashboard) dashboard.classList.add('hidden');
+    if (userPill) userPill.classList.add('hidden');
+    if (loginNavBtn) loginNavBtn.classList.remove('hidden');
 }
 
 /* ============================================================================
