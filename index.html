@@ -1,8 +1,19 @@
 <!DOCTYPE html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        /* Aplica o tema salvo imediatamente no cabeçalho antes da pintura da página para evitar piscada (FOUC) */
+        (function() {
+            try {
+                var savedTheme = localStorage.getItem('gastei_agora_theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            } catch(e) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
     <title>Gastei & Agora? | Gestor de Dívidas & Consultor IA</title>
     <link rel="stylesheet" href="style.css">
     <!-- Google Fonts -->
@@ -404,8 +415,11 @@
                                 <h4 id="calendarMonthYearDisplay">Novembro 2026</h4>
                                 <button type="button" class="btn-cal-nav" id="nextMonthBtn" onclick="changeCalendarMonth(1)" title="Próximo mês">▶</button>
                             </div>
+                            <div class="calendar-machine-info">
+                                <span class="calendar-machine-clock" id="calendarMachineClock" title="Data e hora em tempo real da sua máquina">📅 Carregando data...</span>
+                            </div>
                             <div class="calendar-quick-actions">
-                                <button type="button" class="btn btn-outline btn-xs" onclick="goToTodayCalendar()" title="Ir para hoje">Hoje</button>
+                                <button type="button" class="btn btn-outline btn-xs" onclick="goToTodayCalendar()" title="Ir para a data de hoje na sua máquina">Hoje 📍</button>
                                 <button type="button" class="btn btn-outline btn-xs" onclick="goToDeadlineCalendar()" title="Ver prazo final">Ver Deadline 🏁</button>
                             </div>
                         </div>

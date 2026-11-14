@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initPrivacy();
     setupDateConstraints();
     setupPrivacyTouchSupport();
+    startMachineClock();
 
     // Configura o ouvinte oficial reativo do Supabase Auth
     await setupAuthListener();
@@ -147,7 +148,13 @@ function applyTheme(theme, syncWithDb = true) {
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // Ativa transição suave apenas durante a alternância manual do usuário
+    document.body.classList.add('theme-transitioning');
     applyTheme(newTheme, true);
+    setTimeout(() => {
+        document.body.classList.remove('theme-transitioning');
+    }, 350);
 }
 
 /**
@@ -1308,30 +1315,52 @@ function escapeHtml(text) {
    ============================================================================ */
 
 /**
- * Inicializa o calendário: carrega notas locais, sincroniza a deadline
- * e renderiza o mês corrente e painel de notas.
+ * Inicializa o calendário: sincronizado na data e horário exatos da máquina do usuário
  */
 function initCalendar() {
     loadCalendarNotes();
 
-    const todayStr = toISODateString(new Date());
-
     // Se houver uma deadline cadastrada, sincroniza a nota da deadline
     if (currentFinanceData.deadline) {
         syncDeadlineWithCalendarNotes();
-        const [targetY, targetM] = currentFinanceData.deadline.split('-').map(Number);
-        calendarState.viewYear = targetY;
-        calendarState.viewMonth = targetM - 1;
-        calendarState.selectedDateStr = currentFinanceData.deadline;
-    } else {
-        const now = new Date();
-        calendarState.viewYear = now.getFullYear();
-        calendarState.viewMonth = now.getMonth();
-        calendarState.selectedDateStr = todayStr;
     }
+
+    // Inicializa SEMPRE no mês e ano da data atual da máquina
+    const machineNow = new Date();
+    calendarState.viewYear = machineNow.getFullYear();
+    calendarState.viewMonth = machineNow.getMonth(); // 0 a 11
+    calendarState.selectedDateStr = toISODateString(machineNow);
+
+    // Inicia e atualiza o relógio em tempo real da máquina
+    startMachineClock();
 
     renderCalendarGrid();
     renderSelectedDateNotes();
+}
+
+let machineClockTimer = null;
+function startMachineClock() {
+    updateMachineClock();
+    if (machineClockTimer) clearInterval(machineClockTimer);
+    machineClockTimer = setInterval(updateMachineClock, 1000);
+}
+
+function updateMachineClock() {
+    const clockEl = document.getElementById('calendarMachineClock');
+    if (!clockEl) return;
+    const now = new Date();
+    const dateFormatted = now.toLocaleDateString('pt-BR', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+    const timeFormatted = now.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    clockEl.innerHTML = `📅 <strong>${dateFormatted}</strong> &bull; ⏰ <strong>${timeFormatted}</strong>`;
 }
 
 /**
