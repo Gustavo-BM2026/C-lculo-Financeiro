@@ -32,7 +32,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initSupabase === 'function') {
         initSupabase();
     }
-    updateSyncStatusUI();
 
     initTheme();
     initPrivacy();
@@ -40,25 +39,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await checkExistingSession();
     setupPrivacyTouchSupport();
 });
-
-/**
- * Atualiza o indicador visual de sincronização na Navbar (Local vs Nuvem Supabase)
- */
-function updateSyncStatusUI() {
-    const syncPill = document.getElementById('syncStatusPill');
-    const syncText = document.getElementById('syncStatusText');
-    if (!syncPill) return;
-
-    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
-        syncPill.className = 'sync-pill cloud';
-        if (syncText) syncText.textContent = 'Supabase';
-        syncPill.setAttribute('title', 'Sincronização em Nuvem ATIVA (Supabase conectado). Seus dados estão seguros na nuvem!');
-    } else {
-        syncPill.className = 'sync-pill local';
-        if (syncText) syncText.textContent = 'Local';
-        syncPill.setAttribute('title', 'Armazenamento Local (LocalStorage). Para salvar em nuvem, insira suas credenciais em supabaseConfig.js.');
-    }
-}
 
 function initTheme() {
     const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'dark';

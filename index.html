@@ -23,24 +23,11 @@
             </div>
 
             <div class="nav-actions">
-                <!-- Sync Status Indicator -->
-                <div id="syncStatusPill" class="sync-pill local" title="Modo de Armazenamento: LocalStorage (Offline). Configure o Supabase para sincronizar em nuvem.">
-                    <span class="sync-dot"></span>
-                    <span id="syncStatusText" class="sync-text">Local</span>
-                </div>
-
                 <!-- Theme Toggle Button -->
                 <button id="themeToggleBtn" class="btn-icon" aria-label="Alternar tema" title="Alternar tema">
                     <span class="theme-icon light-icon">☀️</span>
                     <span class="theme-icon dark-icon">🌙</span>
                     <span class="theme-text">Modo Claro</span>
-                </button>
-
-                <!-- Privacy Toggle Button (Ocultar/Mostrar Valores) -->
-                <button id="privacyToggleBtn" class="btn-icon" aria-label="Ocultar ou mostrar números das informações" title="Ocultar valores das informações (passe o mouse para ver)">
-                    <span class="privacy-icon eye-open">👁️</span>
-                    <span class="privacy-icon eye-closed hidden">🙈</span>
-                    <span class="privacy-text">Ocultar Valores</span>
                 </button>
 
                 <!-- Botão de Login / Cadastro (Ao lado do tema, visível quando deslogado) -->
@@ -272,15 +259,24 @@
         <!-- SECTION: Painel Principal da Planilha e Gestão (Visível após login) -->
         <section id="dashboardSection" class="dashboard-section hidden">
             
-            <!-- Saudação Personalizada -->
+            <!-- Saudação Personalizada & Ações do Dashboard -->
             <div class="user-greeting-banner">
                 <div class="greeting-text">
                     <h2>Olá, <span id="salutationName">Guerreiro</span>! 👋</h2>
                     <p id="greetingSubtitle">Atualize seus dados abaixo e defina seu deadline. Nossa IA cuidará do resto!</p>
                 </div>
-                <div class="status-chip" id="debtHealthBadge">
-                    <span class="status-indicator"></span>
-                    <span id="debtHealthText">Aguardando dados...</span>
+                <div class="greeting-actions">
+                    <!-- Botão de Privacidade: visível apenas no Dashboard Financeiro -->
+                    <button id="privacyToggleBtn" class="btn-icon" aria-label="Ocultar ou mostrar números das informações" title="Ocultar valores das informações (passe o mouse para ver)">
+                        <span class="privacy-icon eye-open">👁️</span>
+                        <span class="privacy-icon eye-closed hidden">🙈</span>
+                        <span class="privacy-text">Ocultar Valores</span>
+                    </button>
+
+                    <div class="status-chip" id="debtHealthBadge">
+                        <span class="status-indicator"></span>
+                        <span id="debtHealthText">Aguardando dados...</span>
+                    </div>
                 </div>
             </div>
 

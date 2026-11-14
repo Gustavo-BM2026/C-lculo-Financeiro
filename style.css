@@ -1029,6 +1029,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-size: 0.9rem;
 }
 
+.greeting-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
 .status-chip {
     display: flex;
     align-items: center;
@@ -1592,8 +1599,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         gap: 0.75rem;
     }
 
-    .status-chip {
+    .greeting-actions {
         width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+    }
+
+    .status-chip {
         justify-content: center;
     }
 
