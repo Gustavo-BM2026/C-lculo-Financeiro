@@ -36,9 +36,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
     initPrivacy();
     setupDateConstraints();
-    await checkExistingSession();
     setupPrivacyTouchSupport();
+
+    // Configura o ouvinte oficial reativo do Supabase Auth
+    await setupAuthListener();
 });
+
+/**
+ * Configura o listener reativo oficial do Supabase Auth (onAuthStateChange)
+ * Trata login, logout, renovação de token e sincronização entre abas
+ */
+async function setupAuthListener() {
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        // Registra o listener reativo para eventos de autenticação
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            console.log('🔄 Supabase Auth Event:', event);
+
+            if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+                if (session?.user) {
+                    await loadUserSessionFromSupabase(session.user);
+                }
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+                renderAppForGuest();
+            }
+        });
+    } else {
+        // Fallback: Recupera sessão local do LocalStorage
+        checkExistingSessionLocalStorage();
+    }
+}
+
+async function loadUserSessionFromSupabase(authUser) {
+    try {
+        const { data: profile } = await supabaseClient
+            .from('profiles')
+            .select('full_name, theme_preference, privacy_mode')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+        currentUser = {
+            id: authUser.id,
+            email: authUser.email,
+            name: profile?.full_name || authUser.user_metadata?.full_name || 'Guerreiro Financeiro'
+        };
+
+        if (profile?.theme_preference) applyTheme(profile.theme_preference, false);
+        if (profile?.privacy_mode !== undefined) setPrivacyMode(profile.privacy_mode, false);
+
+        renderAppForAuthenticatedUser();
+    } catch (err) {
+        console.warn('Erro ao carregar perfil do Supabase:', err);
+    }
+}
+
+function checkExistingSessionLocalStorage() {
+    const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+    if (raw) {
+        try {
+            currentUser = JSON.parse(raw);
+            renderAppForAuthenticatedUser();
+            return;
+        } catch (err) {
+            console.error('Erro ao recuperar sessão do LocalStorage:', err);
+        }
+    }
+    renderAppForGuest();
+}
 
 function initTheme() {
     const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'dark';
@@ -306,6 +371,9 @@ function saveUsersToStorage(users) {
 
 async function handleRegister(e) {
     e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.textContent : 'Criar Conta & Começar';
+
     const nameInput = document.getElementById('regName').value.trim();
     const emailInput = document.getElementById('regEmail').value.trim().toLowerCase();
     const passwordInput = document.getElementById('regPassword').value;
@@ -347,9 +415,15 @@ async function handleRegister(e) {
         return;
     }
 
-    // Se o Supabase estiver configurado, registra no Supabase Auth
-    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
-        try {
+    // Feedback visual de carregamento
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Criando sua conta...';
+    }
+
+    try {
+        // Se o Supabase estiver configurado, registra no Supabase Auth
+        if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
             const { data, error } = await supabaseClient.auth.signUp({
                 email: emailInput,
                 password: passwordInput,
@@ -361,64 +435,80 @@ async function handleRegister(e) {
             });
 
             if (error) {
-                registerError.textContent = 'Erro ao cadastrar no Supabase: ' + error.message;
+                let msg = error.message;
+                if (msg.includes('already registered')) {
+                    msg = 'Este e-mail já está cadastrado. Por favor, faça login.';
+                } else if (msg.includes('Password should be')) {
+                    msg = 'A senha informada não atende aos requisitos de segurança do Supabase.';
+                }
+                registerError.textContent = 'Erro ao cadastrar: ' + msg;
                 registerError.classList.remove('hidden');
                 return;
             }
 
             if (data?.user) {
-                registerSuccess.textContent = 'Conta criada com sucesso no Supabase! Entrando...';
+                // Caso o Supabase esteja configurado para exigir confirmação de e-mail (sem sessão imediata)
+                if (!data.session) {
+                    registerSuccess.innerHTML = `
+                        🎉 <strong>Conta criada com sucesso!</strong><br>
+                        Enviamos um link de confirmação para <em>${escapeHtml(emailInput)}</em>.<br>
+                        Por favor, clique no link do seu e-mail para ativar sua conta e fazer login.
+                    `;
+                    registerSuccess.classList.remove('hidden');
+                    return;
+                }
+
+                // Se auto-confirm estiver ativado, a sessão é iniciada imediatamente
+                registerSuccess.textContent = 'Conta criada com sucesso! Acessando seu painel...';
                 registerSuccess.classList.remove('hidden');
-
-                const userObj = {
-                    id: data.user.id,
-                    name: nameInput,
-                    email: emailInput
-                };
-
-                setTimeout(() => {
-                    setSessionUser(userObj);
-                }, 850);
+                // O listener onAuthStateChange('SIGNED_IN') cuidará da transição da UI
                 return;
             }
-        } catch (err) {
-            registerError.textContent = 'Falha de comunicação com o Supabase: ' + err.message;
+        }
+
+        // Fallback: Armazenamento Local no LocalStorage
+        const users = getUsersFromStorage();
+        const userExists = users.some(u => u.email === emailInput);
+
+        if (userExists) {
+            registerError.textContent = 'Este e-mail já está cadastrado. Alterne para a aba "Entrar".';
             registerError.classList.remove('hidden');
             return;
         }
-    }
 
-    // Fallback: Armazenamento Local no LocalStorage
-    const users = getUsersFromStorage();
-    const userExists = users.some(u => u.email === emailInput);
+        const newUser = {
+            id: 'usr_' + Date.now(),
+            name: nameInput,
+            email: emailInput,
+            password: passwordInput,
+            createdAt: new Date().toISOString()
+        };
 
-    if (userExists) {
-        registerError.textContent = 'Este e-mail já está cadastrado. Alterne para a aba "Entrar".';
+        users.push(newUser);
+        saveUsersToStorage(users);
+
+        registerSuccess.textContent = 'Conta criada com sucesso! Redirecionando para seu painel...';
+        registerSuccess.classList.remove('hidden');
+
+        setTimeout(() => {
+            setSessionUser(newUser);
+        }, 750);
+    } catch (err) {
+        registerError.textContent = 'Falha ao processar cadastro: ' + err.message;
         registerError.classList.remove('hidden');
-        return;
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+        }
     }
-
-    const newUser = {
-        id: 'usr_' + Date.now(),
-        name: nameInput,
-        email: emailInput,
-        password: passwordInput,
-        createdAt: new Date().toISOString()
-    };
-
-    users.push(newUser);
-    saveUsersToStorage(users);
-
-    registerSuccess.textContent = 'Conta criada com sucesso! Redirecionando para seu painel...';
-    registerSuccess.classList.remove('hidden');
-
-    setTimeout(() => {
-        setSessionUser(newUser);
-    }, 850);
 }
 
 async function handleLogin(e) {
     e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.textContent : 'Acessar Meu Painel';
+
     const emailInput = document.getElementById('loginEmail').value.trim().toLowerCase();
     const passwordInput = document.getElementById('loginPassword').value;
     const loginError = document.getElementById('loginError');
@@ -434,107 +524,67 @@ async function handleLogin(e) {
         return;
     }
 
-    // Se o Supabase estiver configurado, autentica via Supabase Auth
-    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
-        try {
+    // Feedback visual de carregamento
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verificando credenciais...';
+    }
+
+    try {
+        // Se o Supabase estiver configurado, autentica via Supabase Auth
+        if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
             const { data, error } = await supabaseClient.auth.signInWithPassword({
                 email: emailInput,
                 password: passwordInput
             });
 
             if (error) {
-                loginError.textContent = 'Erro no login: ' + (error.message.includes('Invalid') ? 'E-mail ou senha incorretos.' : error.message);
+                let msg = error.message;
+                if (msg.includes('Invalid login credentials')) {
+                    msg = 'E-mail ou senha incorretos. Verifique suas credenciais.';
+                } else if (msg.includes('Email not confirmed')) {
+                    msg = 'Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada e clique no link de ativação enviado pelo Supabase.';
+                } else if (msg.includes('Too many requests')) {
+                    msg = 'Muitas tentativas em sequência. Por favor, aguarde alguns instantes antes de tentar novamente.';
+                }
+                loginError.textContent = msg;
                 loginError.classList.remove('hidden');
                 return;
             }
 
-            if (data?.user) {
-                // Busca perfil com nome e preferências
-                const { data: profile } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name, theme_preference, privacy_mode')
-                    .eq('id', data.user.id)
-                    .maybeSingle();
-
-                const userObj = {
-                    id: data.user.id,
-                    name: profile?.full_name || data.user.user_metadata?.full_name || 'Guerreiro Financeiro',
-                    email: data.user.email
-                };
-
-                if (profile?.theme_preference) applyTheme(profile.theme_preference, false);
-                if (profile?.privacy_mode !== undefined) setPrivacyMode(profile.privacy_mode, false);
-
-                setSessionUser(userObj);
+            if (data?.session) {
+                // O listener onAuthStateChange('SIGNED_IN') cuidará do carregamento do perfil e renderização
+                closeAuthModal();
                 return;
             }
-        } catch (err) {
-            loginError.textContent = 'Falha de comunicação com o Supabase: ' + err.message;
+        }
+
+        // Fallback: Autenticação via LocalStorage
+        const users = getUsersFromStorage();
+        const user = users.find(u => u.email === emailInput && u.password === passwordInput);
+
+        if (!user) {
+            loginError.textContent = 'E-mail ou senha incorretos. Verifique seus dados ou crie uma conta.';
             loginError.classList.remove('hidden');
             return;
         }
-    }
 
-    // Fallback: Autenticação via LocalStorage
-    const users = getUsersFromStorage();
-    const user = users.find(u => u.email === emailInput && u.password === passwordInput);
-
-    if (!user) {
-        loginError.textContent = 'E-mail ou senha incorretos. Verifique seus dados ou crie uma conta.';
+        setSessionUser(user);
+    } catch (err) {
+        loginError.textContent = 'Falha de comunicação: ' + err.message;
         loginError.classList.remove('hidden');
-        return;
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+        }
     }
-
-    setSessionUser(user);
 }
 
 function setSessionUser(user) {
     currentUser = user;
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
     renderAppForAuthenticatedUser();
-}
-
-async function checkExistingSession() {
-    // 1. Tenta recuperar sessão do Supabase se ativo
-    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
-        try {
-            const { data: { session }, error } = await supabaseClient.auth.getSession();
-            if (session?.user) {
-                const { data: profile } = await supabaseClient
-                    .from('profiles')
-                    .select('full_name, theme_preference, privacy_mode')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
-
-                currentUser = {
-                    id: session.user.id,
-                    email: session.user.email,
-                    name: profile?.full_name || session.user.user_metadata?.full_name || 'Guerreiro Financeiro'
-                };
-
-                if (profile?.theme_preference) applyTheme(profile.theme_preference, false);
-                if (profile?.privacy_mode !== undefined) setPrivacyMode(profile.privacy_mode, false);
-
-                renderAppForAuthenticatedUser();
-                return;
-            }
-        } catch (err) {
-            console.warn('Erro ao verificar sessão Supabase:', err);
-        }
-    }
-
-    // 2. Fallback: Recupera do LocalStorage
-    const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-    if (raw) {
-        try {
-            currentUser = JSON.parse(raw);
-            renderAppForAuthenticatedUser();
-            return;
-        } catch (err) {
-            console.error('Erro ao recuperar sessão:', err);
-        }
-    }
-    renderAppForGuest();
 }
 
 async function handleLogout() {
