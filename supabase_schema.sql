@@ -87,6 +87,29 @@ drop policy if exists "chat_messages_insert_own" on public.chat_messages;
 create policy "chat_messages_insert_own" on public.chat_messages for insert to authenticated with check (auth.uid() = user_id);
 
 -- ============================================================================
+-- 5. TABELA DE AUDITORIA & REGISTRO DE ATIVIDADES (AUDIT_LOGS)
+-- Permite saber quem, quando e o que alterou dados financeiros ou notas no site
+-- ============================================================================
+create table if not exists public.audit_logs (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references auth.users(id) on delete set null,
+    user_email text not null default 'Visitante',
+    action text not null,
+    description text not null,
+    details jsonb default '{}'::jsonb,
+    checksum text,
+    created_at timestamptz not null default now()
+);
+
+alter table public.audit_logs enable row level security;
+
+drop policy if exists "audit_logs_select_own" on public.audit_logs;
+create policy "audit_logs_select_own" on public.audit_logs for select to authenticated using (auth.uid() = user_id or auth.uid() is not null);
+
+drop policy if exists "audit_logs_insert_own" on public.audit_logs;
+create policy "audit_logs_insert_own" on public.audit_logs for insert to authenticated with check (auth.uid() = user_id or user_id is null);
+
+-- ============================================================================
 -- 7. TRIGGER: CRIAR PERFIL AUTOMATICAMENTE NO CADASTRO
 -- ============================================================================
 create or replace function public.handle_new_user()

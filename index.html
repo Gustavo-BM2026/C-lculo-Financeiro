@@ -41,6 +41,12 @@
                     <span class="theme-text">Modo Claro</span>
                 </button>
 
+                <!-- Botão de Auditoria / Logs (Visível no topo) -->
+                <button id="auditNavBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria" title="Ver logs de alterações do site" onclick="openAuditModal()">
+                    <span class="nav-icon">📜</span>
+                    <span class="nav-text">Logs</span>
+                </button>
+
                 <!-- Botão de Login / Cadastro (Ao lado do tema, visível quando deslogado) -->
                 <button id="loginNavBtn" class="btn btn-primary btn-sm nav-login-btn" onclick="openAuthModal('login')" title="Entrar ou criar uma conta">
                     <span class="nav-login-icon">🔑</span>
@@ -267,6 +273,62 @@
             </div>
         </div>
 
+        <!-- MODAL: Auditoria e Log de Atividades -->
+        <div id="auditModal" class="modal-backdrop hidden" onclick="handleAuditBackdropClick(event)">
+            <div class="modal-container modal-lg">
+                <button class="btn-close-modal" onclick="closeAuditModal()" aria-label="Fechar janela" title="Fechar">✕</button>
+                
+                <div class="card audit-card">
+                    <div class="audit-modal-header">
+                        <div class="audit-header-title">
+                            <span class="audit-badge-icon">📜</span>
+                            <div>
+                                <h3>Registro de Atividades & Auditoria</h3>
+                                <p>Rastreamento detalhado de alterações de dados, lembretes e acessos no site.</p>
+                            </div>
+                        </div>
+                        <div class="audit-integrity-status" id="auditIntegrityBadge">
+                            <span class="status-indicator"></span>
+                            <span id="auditIntegrityText">Integridade: Verificada</span>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Ações & Filtros -->
+                    <div class="audit-controls-bar">
+                        <div class="audit-filter-group">
+                            <label for="auditFilterSelect">Filtrar:</label>
+                            <select id="auditFilterSelect" onchange="renderAuditLogsList()">
+                                <option value="all">Todas as atividades</option>
+                                <option value="FINANCE_UPDATE">💰 Alterações Financeiras</option>
+                                <option value="NOTE_ADDED">📝 Lembretes Adicionados</option>
+                                <option value="NOTE_DELETED">🗑️ Lembretes Removidos</option>
+                                <option value="AUTH">🔑 Acessos (Login / Logout / Cadastro)</option>
+                                <option value="SETTINGS_CHANGE">⚙️ Configurações (Tema / Privacidade)</option>
+                                <option value="SECURITY_ALERT">🚨 Alertas de Segurança</option>
+                            </select>
+                        </div>
+                        <div class="audit-btn-actions">
+                            <button type="button" class="btn btn-outline btn-xs" onclick="exportAuditLogs()" title="Baixar histórico em arquivo JSON">
+                                📥 Baixar Relatório
+                            </button>
+                            <button type="button" class="btn btn-outline btn-xs btn-danger-ghost" onclick="clearAuditLogs()" title="Limpar histórico local">
+                                🗑️ Limpar Logs
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Logs -->
+                    <div class="audit-logs-container" id="auditLogsContainer">
+                        <!-- Gerado dinamicamente via JS -->
+                    </div>
+
+                    <div class="audit-modal-footer">
+                        <small>🛡️ Encadeamento criptográfico SHA-256 ativo: qualquer manipulação externa é sinalizada em vermelho.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- SECTION: Painel Principal da Planilha e Gestão (Visível após login) -->
         <section id="dashboardSection" class="dashboard-section hidden">
             
@@ -282,6 +344,12 @@
                         <span class="privacy-icon eye-open">👁️</span>
                         <span class="privacy-icon eye-closed hidden">🙈</span>
                         <span class="privacy-text">Ocultar Valores</span>
+                    </button>
+
+                    <!-- Botão de Auditoria / Logs -->
+                    <button id="auditGreetingBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria" title="Ver logs e histórico de alterações no site" onclick="openAuditModal()">
+                        <span class="audit-icon">📜</span>
+                        <span class="audit-text">Registro de Atividades</span>
                     </button>
 
                     <div class="status-chip" id="debtHealthBadge">

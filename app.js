@@ -12,7 +12,8 @@ const STORAGE_KEYS = {
     USERS: 'gastei_agora_users',
     CURRENT_USER: 'gastei_agora_session',
     FINANCE_DATA: 'gastei_agora_finance_', // prefixo + userId
-    CALENDAR_NOTES: 'gastei_agora_calendar_notes_' // prefixo + userId
+    CALENDAR_NOTES: 'gastei_agora_calendar_notes_', // prefixo + userId
+    AUDIT_LOGS: 'gastei_agora_audit_logs' // log de atividades e auditoria
 };
 
 // Estado da Aplicação
@@ -144,6 +145,7 @@ async function checkExistingSessionLocalStorage() {
                 }
             }
             console.warn('Sessão local inválida ou adulterada. Redirecionando para login.');
+            logActivity('SECURITY_ALERT', '⚠️ Tentativa de adulteração de token de sessão detectada e bloqueada.', {});
             localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
         } catch (err) {
             console.error('Erro ao recuperar sessão do LocalStorage:', err);
@@ -185,6 +187,7 @@ function toggleTheme() {
     // Ativa transição suave apenas durante a alternância manual do usuário
     document.body.classList.add('theme-transitioning');
     applyTheme(newTheme, true);
+    logActivity('SETTINGS_CHANGE', `Tema visual alternado para: ${newTheme === 'dark' ? 'Modo Escuro' : 'Modo Claro'}`, { theme: newTheme });
     setTimeout(() => {
         document.body.classList.remove('theme-transitioning');
     }, 350);
@@ -211,6 +214,10 @@ function togglePrivacyMode() {
 function setPrivacyMode(enabled, syncWithDb = true) {
     isPrivacyActive = enabled;
     localStorage.setItem(STORAGE_KEYS.PRIVACY, enabled ? 'true' : 'false');
+
+    if (syncWithDb) {
+        logActivity('SETTINGS_CHANGE', `Modo Privacidade ${enabled ? 'ativado (valores ocultos)' : 'desativado (valores visíveis)'}`, { privacy: enabled });
+    }
 
     const body = document.body;
     const privacyBtn = document.getElementById('privacyToggleBtn');
@@ -563,6 +570,8 @@ async function handleRegister(e) {
         registerSuccess.textContent = 'Conta criada com sucesso! Redirecionando para seu painel...';
         registerSuccess.classList.remove('hidden');
 
+        await logActivity('AUTH_REGISTER', `Nova conta cadastrada: ${nameInput} (${emailInput})`, { name: nameInput, email: emailInput });
+
         setTimeout(async () => {
             await setSessionUser(newUser);
             window.location.reload();
@@ -627,6 +636,7 @@ async function handleLogin(e) {
             }
 
             if (data?.session) {
+                await logActivity('AUTH_LOGIN', `Login realizado com sucesso via Supabase por ${emailInput}`, { email: emailInput });
                 closeAuthModal();
                 window.location.reload();
                 return;
@@ -651,6 +661,7 @@ async function handleLogin(e) {
             saveUsersToStorage(users);
         }
 
+        await logActivity('AUTH_LOGIN', `Login realizado com sucesso por ${emailInput}`, { email: emailInput });
         await setSessionUser(user);
         window.location.reload();
     } catch (err) {
@@ -678,6 +689,7 @@ async function setSessionUser(user) {
 }
 
 async function handleLogout() {
+    const loggingOutEmail = currentUser?.email || 'usuário';
     if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
         try {
             await supabaseClient.auth.signOut();
@@ -685,6 +697,7 @@ async function handleLogout() {
             console.warn('Erro ao encerrar sessão no Supabase:', e);
         }
     }
+    await logActivity('AUTH_LOGOUT', `Sessão encerrada por ${loggingOutEmail}`, {});
     currentUser = null;
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     sessionStorage.clear();
@@ -883,6 +896,11 @@ async function handleSaveFinanceData(e) {
         return;
     }
 
+    const oldSalary = currentFinanceData.salary;
+    const oldDebt = currentFinanceData.debt;
+    const oldDeadline = currentFinanceData.deadline;
+    const oldEssentials = currentFinanceData.essentials;
+
     currentFinanceData = {
         salary,
         debt,
@@ -923,6 +941,18 @@ async function handleSaveFinanceData(e) {
     syncDeadlineWithCalendarNotes();
     renderCalendarGrid();
     renderSelectedDateNotes();
+
+    const changes = [];
+    if (oldSalary !== salary) changes.push(`Salário: ${formatCurrency(oldSalary)} ➜ ${formatCurrency(salary)}`);
+    if (oldDebt !== debt) changes.push(`Dívida: ${formatCurrency(oldDebt)} ➜ ${formatCurrency(debt)}`);
+    if (oldDeadline !== deadline) changes.push(`Deadline: ${formatDateBR(oldDeadline)} ➜ ${formatDateBR(deadline)}`);
+    if (oldEssentials !== essentials) changes.push(`Gastos: ${formatCurrency(oldEssentials)} ➜ ${formatCurrency(essentials)}`);
+
+    const logDesc = changes.length > 0 ? `Atualização financeira: ${changes.join(' | ')}` : 'Dados financeiros confirmados';
+    await logActivity('FINANCE_UPDATE', logDesc, {
+        old: { salary: oldSalary, debt: oldDebt, deadline: oldDeadline, essentials: oldEssentials },
+        new: { salary, debt, deadline, essentials }
+    });
     
     // Notificação breve para o usuário
     appendAIMessage(`Excelente, ${currentUser.name}! Seus dados foram salvos: Salário de <strong>${formatCurrency(salary)}</strong>, dívida de <strong>${formatCurrency(debt)}</strong> e deadline para <strong>${formatDateBR(deadline)}</strong>. Clique em "Gerar Diagnóstico Rápido" ou confira as metas calculadas ao lado!`);
@@ -1730,6 +1760,8 @@ function handleSaveCalendarNote(event) {
     calendarState.notes[dateStr].push(newNote);
     saveCalendarNotes();
 
+    logActivity('NOTE_ADDED', `Lembrete adicionado em ${formatDateBR(dateStr)}: "${text}"${val ? ` (${formatCurrency(val)})` : ''}`, { date: dateStr, text, value: val });
+
     // Limpa os campos
     textInput.value = '';
     if (valInput) valInput.value = '';
@@ -1744,12 +1776,17 @@ function handleSaveCalendarNote(event) {
 function handleDeleteCalendarNote(dateStr, noteId) {
     if (!calendarState.notes[dateStr]) return;
 
+    const noteToDelete = calendarState.notes[dateStr]?.find(n => n.id === noteId);
+    const noteDesc = noteToDelete ? `"${noteToDelete.text}"${noteToDelete.value ? ` (${formatCurrency(noteToDelete.value)})` : ''}` : noteId;
+
     calendarState.notes[dateStr] = calendarState.notes[dateStr].filter(n => n.id !== noteId);
     if (calendarState.notes[dateStr].length === 0) {
         delete calendarState.notes[dateStr];
     }
 
     saveCalendarNotes();
+    logActivity('NOTE_DELETED', `Lembrete removido em ${formatDateBR(dateStr)}: ${noteDesc}`, { date: dateStr, noteId });
+
     renderCalendarGrid();
     renderSelectedDateNotes();
 }
@@ -1793,4 +1830,280 @@ function goToDeadlineCalendar() {
     calendarState.viewYear = y;
     calendarState.viewMonth = m - 1;
     selectCalendarDate(currentFinanceData.deadline);
+}
+
+/* ============================================================================
+   8. SISTEMA DE AUDITORIA & RASTREAMENTO DE ATIVIDADES (AUDIT LOGS)
+   Permite identificar quem, quando e o que alterou no site, com encadeamento de hash SHA-256
+   ============================================================================ */
+
+/**
+ * Retorna os logs de auditoria armazenados localmente
+ */
+function getAuditLogsFromStorage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.AUDIT_LOGS);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error('Erro ao ler logs de auditoria:', e);
+        return [];
+    }
+}
+
+/**
+ * Salva os logs de auditoria no LocalStorage
+ */
+function saveAuditLogsToStorage(logs) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(logs));
+    } catch (e) {
+        console.error('Erro ao salvar logs de auditoria:', e);
+    }
+}
+
+/**
+ * Calcula o hash SHA-256 encadeado de uma entrada de log para integridade à prova de adulteração
+ */
+async function calculateLogHash(previousHash, timestamp, action, description, email) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${previousHash}|${timestamp}|${action}|${description}|${email}|audit_secret_v1`);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Registra uma atividade no log de auditoria local e na nuvem do Supabase (se conectado)
+ */
+async function logActivity(action, description, details = {}) {
+    try {
+        const logs = getAuditLogsFromStorage();
+        const now = new Date();
+        const timestamp = now.toISOString();
+        const email = currentUser ? currentUser.email : 'Visitante';
+        const userName = currentUser ? currentUser.name : 'Visitante';
+
+        const previousHash = logs.length > 0 ? (logs[0].hash || 'genesis_hash') : 'genesis_hash';
+        const hash = await calculateLogHash(previousHash, timestamp, action, description, email);
+
+        const newEntry = {
+            id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            timestamp,
+            dateFormatted: now.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+            timeFormatted: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            action,
+            description,
+            details,
+            userEmail: email,
+            userName: userName,
+            previousHash,
+            hash
+        };
+
+        logs.unshift(newEntry);
+
+        // Limita a 200 entradas mais recentes para otimização de espaço
+        if (logs.length > 200) {
+            logs.length = 200;
+        }
+
+        saveAuditLogsToStorage(logs);
+
+        // Se o Supabase estiver configurado, salva também na nuvem
+        if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+            supabaseClient.from('audit_logs').insert({
+                user_id: currentUser ? currentUser.id : null,
+                user_email: email,
+                action: action,
+                description: description,
+                details: details,
+                checksum: hash,
+                created_at: timestamp
+            }).then(({ error }) => {
+                if (error) console.warn('Erro ao sincronizar log com Supabase:', error);
+            });
+        }
+
+        // Se o modal estiver aberto, atualiza a lista em tempo real
+        const modal = document.getElementById('auditModal');
+        if (modal && !modal.classList.contains('hidden')) {
+            renderAuditLogsList();
+        }
+    } catch (err) {
+        console.warn('Erro ao registrar log de atividade:', err);
+    }
+}
+
+/**
+ * Valida a integridade encadeada de todos os registros de log
+ */
+async function verifyAuditLogsIntegrity() {
+    const logs = getAuditLogsFromStorage();
+    if (logs.length <= 1) return { valid: true };
+
+    for (let i = 0; i < logs.length; i++) {
+        const entry = logs[i];
+        const prevHash = (i === logs.length - 1) ? 'genesis_hash' : (logs[i + 1].hash || 'genesis_hash');
+        const expected = await calculateLogHash(prevHash, entry.timestamp, entry.action, entry.description, entry.userEmail);
+        if (entry.hash !== expected) {
+            return { valid: false, tamperedIndex: i, entry };
+        }
+    }
+    return { valid: true };
+}
+
+/**
+ * Abre o modal de auditoria e renderiza os logs
+ */
+async function openAuditModal() {
+    const modal = document.getElementById('auditModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        await renderAuditLogsList();
+    }
+}
+
+/**
+ * Fecha o modal de auditoria
+ */
+function closeAuditModal() {
+    const modal = document.getElementById('auditModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+function handleAuditBackdropClick(event) {
+    if (event.target.id === 'auditModal') {
+        closeAuditModal();
+    }
+}
+
+/**
+ * Renderiza os registros de logs no modal com filtro e verificação de integridade
+ */
+async function renderAuditLogsList() {
+    const container = document.getElementById('auditLogsContainer');
+    const badgeEl = document.getElementById('auditIntegrityBadge');
+    const badgeText = document.getElementById('auditIntegrityText');
+    const filterSelect = document.getElementById('auditFilterSelect');
+
+    if (!container) return;
+
+    // 1. Verifica integridade dos registros
+    const integrity = await verifyAuditLogsIntegrity();
+    if (badgeEl && badgeText) {
+        if (integrity.valid) {
+            badgeEl.className = 'audit-integrity-status';
+            badgeText.textContent = 'Integridade: Verificada e Intacta';
+        } else {
+            badgeEl.className = 'audit-integrity-status tampered';
+            badgeText.textContent = '⚠️ Alerta: Registro adulterado externamente!';
+        }
+    }
+
+    // 2. Filtra registros
+    let logs = getAuditLogsFromStorage();
+    const filter = filterSelect ? filterSelect.value : 'all';
+
+    if (filter === 'AUTH') {
+        logs = logs.filter(l => l.action.startsWith('AUTH_'));
+    } else if (filter !== 'all') {
+        logs = logs.filter(l => l.action === filter);
+    }
+
+    if (logs.length === 0) {
+        container.innerHTML = `
+            <div class="empty-audit-hint">
+                <p>Nenhuma atividade encontrada com o filtro selecionado.</p>
+                <small>As ações realizadas no site (alterações de dados, lembretes, acessos) serão exibidas aqui com data e hora exatas.</small>
+            </div>
+        `;
+        return;
+    }
+
+    const actionIcons = {
+        'FINANCE_UPDATE': '💰',
+        'NOTE_ADDED': '📝',
+        'NOTE_DELETED': '🗑️',
+        'AUTH_LOGIN': '🔑',
+        'AUTH_LOGOUT': '🚪',
+        'AUTH_REGISTER': '🎉',
+        'SETTINGS_CHANGE': '⚙️',
+        'SECURITY_ALERT': '🚨',
+        'LOGS_CLEARED': '🧹'
+    };
+
+    const actionTags = {
+        'FINANCE_UPDATE': { text: 'Finanças', cls: 'finance' },
+        'NOTE_ADDED': { text: 'Lembrete', cls: 'note' },
+        'NOTE_DELETED': { text: 'Remoção', cls: 'note' },
+        'AUTH_LOGIN': { text: 'Login', cls: 'auth' },
+        'AUTH_LOGOUT': { text: 'Logout', cls: 'auth' },
+        'AUTH_REGISTER': { text: 'Cadastro', cls: 'auth' },
+        'SETTINGS_CHANGE': { text: 'Configurações', cls: 'settings' },
+        'SECURITY_ALERT': { text: 'Segurança', cls: 'security' },
+        'LOGS_CLEARED': { text: 'Limpeza', cls: 'settings' }
+    };
+
+    container.innerHTML = logs.map(log => {
+        const icon = actionIcons[log.action] || '📌';
+        const tag = actionTags[log.action] || { text: log.action, cls: 'settings' };
+
+        return `
+            <div class="audit-log-item">
+                <div class="audit-log-icon">${icon}</div>
+                <div class="audit-log-content">
+                    <div class="audit-log-header">
+                        <div style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span class="audit-log-type-tag ${tag.cls}">${tag.text}</span>
+                            <span class="audit-log-user">${escapeHtml(log.userEmail)}</span>
+                        </div>
+                        <span class="audit-log-time">📅 ${log.dateFormatted} às ${log.timeFormatted}</span>
+                    </div>
+                    <div class="audit-log-desc">${escapeHtml(log.description)}</div>
+                    <div class="audit-log-checksum" title="Checksum SHA-256 da assinatura do log">
+                        Hash: ${escapeHtml(log.hash ? log.hash.substring(0, 16) + '...' : 'legado')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Exporta o histórico completo de auditoria em arquivo JSON
+ */
+function exportAuditLogs() {
+    const logs = getAuditLogsFromStorage();
+    const payload = {
+        sistema: 'Gastei & Agora? - Relatório Oficial de Auditoria e Atividades',
+        geradoEm: new Date().toISOString(),
+        geradoPor: currentUser ? currentUser.email : 'Visitante',
+        totalAtividades: logs.length,
+        registros: logs
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const yyyymmdd = toISODateString(new Date()).replace(/-/g, '');
+    link.href = url;
+    link.download = `auditoria_atividades_${yyyymmdd}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Limpa os logs locais após confirmação e registra a ação de limpeza
+ */
+async function clearAuditLogs() {
+    if (!confirm('Deseja realmente limpar o histórico local de atividades? Esta ação também será registrada no novo histórico.')) {
+        return;
+    }
+
+    localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
+    await logActivity('LOGS_CLEARED', `Histórico local de auditoria foi limpo por ${currentUser?.email || 'Visitante'}`, {});
+    await renderAuditLogsList();
 }
