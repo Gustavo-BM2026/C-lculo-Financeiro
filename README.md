@@ -65,7 +65,20 @@ Com design moderno em **azul escuro elegante**, o sistema calcula automaticament
 
 - **HTML5 Semântico**: Estruturação acessível, formulários modernos e componentes dinâmicos.
 - **CSS3 Moderno**: Variáveis CSS (*Custom Properties*), Flexbox, CSS Grid, Media Queries avançadas e animações.
-- **JavaScript (ES6+) Puro**: Manipulação de DOM, cálculos financeiros, expressões regulares (Regex), validações em tempo real e persistência com `localStorage`.
+- **JavaScript (ES6+) Puro**: Manipulação de DOM, cálculos financeiros, expressões regulares (Regex) e validações em tempo real.
+- **Supabase (PostgreSQL + Auth + RLS)**: Banco de dados relacional na nuvem com autenticação segura e sincronização automática (com fallback para `localStorage`).
+
+---
+
+## ☁️ Como Conectar ao Supabase (Opcional)
+
+O sistema funciona imediatamente em modo offline (`localStorage`). Para ativar a sincronização em nuvem:
+
+1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
+2. No painel do seu projeto, acesse o **SQL Editor**, cole todo o conteúdo do arquivo [`supabase_schema.sql`](file:///c:/Users/aluno_3_2026/Downloads/Brilha%20Mais/Terceiro%20Projeto/supabase_schema.sql) e clique em **RUN**.
+3. Vá em **Project Settings > API**, copie a **Project URL** e a chave **anon public**.
+4. Abra o arquivo [`supabaseConfig.js`](file:///c:/Users/aluno_3_2026/Downloads/Brilha%20Mais/Terceiro%20Projeto/supabaseConfig.js) e insira sua URL e Anon Key.
+5. Pronto! O indicador no cabeçalho mudará para **🟢 Supabase** e seus dados serão sincronizados na nuvem em tempo real.
 
 ---
 
@@ -88,10 +101,12 @@ Não é necessário instalar nenhuma dependência ou servidor!
 ## 📁 Estrutura de Arquivos
 
 ```text
-├── index.html        # Estrutura principal da página, formulários e painel
-├── style.css         # Estilização completa, temas claro/escuro e responsividade
-├── app.js            # Lógica de autenticação, cálculos matemáticos e FinAI
-└── README.md         # Documentação do projeto
+├── index.html            # Estrutura principal da página, formulários e painel
+├── style.css             # Estilização completa, temas claro/escuro e responsividade
+├── app.js                # Lógica de autenticação híbrida, cálculos e FinAI
+├── supabaseConfig.js     # Configuração das chaves do cliente Supabase
+├── supabase_schema.sql   # Script SQL DDL com tabelas, RLS e triggers
+└── README.md             # Documentação do projeto
 ```
 
 ---

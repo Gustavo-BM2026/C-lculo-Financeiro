@@ -25,19 +25,44 @@ let currentFinanceData = {
 };
 
 /* ============================================================================
-   1. INICIALIZAÇÃO & TEMA (CLARO / AZUL ESCURO) & MODO PRIVACIDADE
+   1. INICIALIZAÇÃO & TEMA (CLARO / AZUL ESCURO) & MODO PRIVACIDADE & SUPABASE
    ============================================================================ */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Inicializa o cliente do Supabase se configurado
+    if (typeof initSupabase === 'function') {
+        initSupabase();
+    }
+    updateSyncStatusUI();
+
     initTheme();
     initPrivacy();
     setupDateConstraints();
-    checkExistingSession();
+    await checkExistingSession();
     setupPrivacyTouchSupport();
 });
 
+/**
+ * Atualiza o indicador visual de sincronização na Navbar (Local vs Nuvem Supabase)
+ */
+function updateSyncStatusUI() {
+    const syncPill = document.getElementById('syncStatusPill');
+    const syncText = document.getElementById('syncStatusText');
+    if (!syncPill) return;
+
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        syncPill.className = 'sync-pill cloud';
+        if (syncText) syncText.textContent = 'Supabase';
+        syncPill.setAttribute('title', 'Sincronização em Nuvem ATIVA (Supabase conectado). Seus dados estão seguros na nuvem!');
+    } else {
+        syncPill.className = 'sync-pill local';
+        if (syncText) syncText.textContent = 'Local';
+        syncPill.setAttribute('title', 'Armazenamento Local (LocalStorage). Para salvar em nuvem, insira suas credenciais em supabaseConfig.js.');
+    }
+}
+
 function initTheme() {
     const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'dark';
-    applyTheme(savedTheme);
+    applyTheme(savedTheme, false);
 
     const themeToggleBtn = document.getElementById('themeToggleBtn');
     if (themeToggleBtn) {
@@ -45,7 +70,7 @@ function initTheme() {
     }
 }
 
-function applyTheme(theme) {
+function applyTheme(theme, syncWithDb = true) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(STORAGE_KEYS.THEME, theme);
 
@@ -53,12 +78,17 @@ function applyTheme(theme) {
     if (themeText) {
         themeText.textContent = theme === 'dark' ? 'Modo Claro' : 'Modo Escuro';
     }
+
+    if (syncWithDb && currentUser && typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        supabaseClient.from('profiles').update({ theme_preference: theme }).eq('id', currentUser.id)
+            .then(({ error }) => { if (error) console.warn('Erro ao sincronizar tema no Supabase:', error); });
+    }
 }
 
 function toggleTheme() {
     const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    applyTheme(newTheme);
+    applyTheme(newTheme, true);
 }
 
 /**
@@ -67,7 +97,7 @@ function toggleTheme() {
 function initPrivacy() {
     const savedPrivacy = localStorage.getItem(STORAGE_KEYS.PRIVACY);
     // Inicia conforme salvo (padrão desligado para primeira experiência amigável)
-    setPrivacyMode(savedPrivacy === 'true');
+    setPrivacyMode(savedPrivacy === 'true', false);
 
     const privacyBtn = document.getElementById('privacyToggleBtn');
     if (privacyBtn) {
@@ -76,10 +106,10 @@ function initPrivacy() {
 }
 
 function togglePrivacyMode() {
-    setPrivacyMode(!isPrivacyActive);
+    setPrivacyMode(!isPrivacyActive, true);
 }
 
-function setPrivacyMode(enabled) {
+function setPrivacyMode(enabled, syncWithDb = true) {
     isPrivacyActive = enabled;
     localStorage.setItem(STORAGE_KEYS.PRIVACY, enabled ? 'true' : 'false');
 
@@ -105,6 +135,11 @@ function setPrivacyMode(enabled) {
         if (eyeClosed) eyeClosed.classList.add('hidden');
         if (privacyText) privacyText.textContent = 'Ocultar Valores';
         privacyBtn.setAttribute('title', 'Ocultar valores das informações (passe o mouse para ver)');
+    }
+
+    if (syncWithDb && currentUser && typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        supabaseClient.from('profiles').update({ privacy_mode: enabled }).eq('id', currentUser.id)
+            .then(({ error }) => { if (error) console.warn('Erro ao sincronizar privacidade no Supabase:', error); });
     }
 }
 
@@ -289,7 +324,7 @@ function saveUsersToStorage(users) {
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
 }
 
-function handleRegister(e) {
+async function handleRegister(e) {
     e.preventDefault();
     const nameInput = document.getElementById('regName').value.trim();
     const emailInput = document.getElementById('regEmail').value.trim().toLowerCase();
@@ -332,7 +367,48 @@ function handleRegister(e) {
         return;
     }
 
-    // 4. Verificação de duplicidade de e-mail
+    // Se o Supabase estiver configurado, registra no Supabase Auth
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: emailInput,
+                password: passwordInput,
+                options: {
+                    data: {
+                        full_name: nameInput
+                    }
+                }
+            });
+
+            if (error) {
+                registerError.textContent = 'Erro ao cadastrar no Supabase: ' + error.message;
+                registerError.classList.remove('hidden');
+                return;
+            }
+
+            if (data?.user) {
+                registerSuccess.textContent = 'Conta criada com sucesso no Supabase! Entrando...';
+                registerSuccess.classList.remove('hidden');
+
+                const userObj = {
+                    id: data.user.id,
+                    name: nameInput,
+                    email: emailInput
+                };
+
+                setTimeout(() => {
+                    setSessionUser(userObj);
+                }, 850);
+                return;
+            }
+        } catch (err) {
+            registerError.textContent = 'Falha de comunicação com o Supabase: ' + err.message;
+            registerError.classList.remove('hidden');
+            return;
+        }
+    }
+
+    // Fallback: Armazenamento Local no LocalStorage
     const users = getUsersFromStorage();
     const userExists = users.some(u => u.email === emailInput);
 
@@ -361,7 +437,7 @@ function handleRegister(e) {
     }, 850);
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
     const emailInput = document.getElementById('loginEmail').value.trim().toLowerCase();
     const passwordInput = document.getElementById('loginPassword').value;
@@ -378,6 +454,48 @@ function handleLogin(e) {
         return;
     }
 
+    // Se o Supabase estiver configurado, autentica via Supabase Auth
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: emailInput,
+                password: passwordInput
+            });
+
+            if (error) {
+                loginError.textContent = 'Erro no login: ' + (error.message.includes('Invalid') ? 'E-mail ou senha incorretos.' : error.message);
+                loginError.classList.remove('hidden');
+                return;
+            }
+
+            if (data?.user) {
+                // Busca perfil com nome e preferências
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name, theme_preference, privacy_mode')
+                    .eq('id', data.user.id)
+                    .maybeSingle();
+
+                const userObj = {
+                    id: data.user.id,
+                    name: profile?.full_name || data.user.user_metadata?.full_name || 'Guerreiro Financeiro',
+                    email: data.user.email
+                };
+
+                if (profile?.theme_preference) applyTheme(profile.theme_preference, false);
+                if (profile?.privacy_mode !== undefined) setPrivacyMode(profile.privacy_mode, false);
+
+                setSessionUser(userObj);
+                return;
+            }
+        } catch (err) {
+            loginError.textContent = 'Falha de comunicação com o Supabase: ' + err.message;
+            loginError.classList.remove('hidden');
+            return;
+        }
+    }
+
+    // Fallback: Autenticação via LocalStorage
     const users = getUsersFromStorage();
     const user = users.find(u => u.email === emailInput && u.password === passwordInput);
 
@@ -396,7 +514,36 @@ function setSessionUser(user) {
     renderAppForAuthenticatedUser();
 }
 
-function checkExistingSession() {
+async function checkExistingSession() {
+    // 1. Tenta recuperar sessão do Supabase se ativo
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        try {
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            if (session?.user) {
+                const { data: profile } = await supabaseClient
+                    .from('profiles')
+                    .select('full_name, theme_preference, privacy_mode')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+
+                currentUser = {
+                    id: session.user.id,
+                    email: session.user.email,
+                    name: profile?.full_name || session.user.user_metadata?.full_name || 'Guerreiro Financeiro'
+                };
+
+                if (profile?.theme_preference) applyTheme(profile.theme_preference, false);
+                if (profile?.privacy_mode !== undefined) setPrivacyMode(profile.privacy_mode, false);
+
+                renderAppForAuthenticatedUser();
+                return;
+            }
+        } catch (err) {
+            console.warn('Erro ao verificar sessão Supabase:', err);
+        }
+    }
+
+    // 2. Fallback: Recupera do LocalStorage
     const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (raw) {
         try {
@@ -410,7 +557,14 @@ function checkExistingSession() {
     renderAppForGuest();
 }
 
-function handleLogout() {
+async function handleLogout() {
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        try {
+            await supabaseClient.auth.signOut();
+        } catch (e) {
+            console.warn('Erro ao encerrar sessão no Supabase:', e);
+        }
+    }
     currentUser = null;
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     renderAppForGuest();
@@ -442,34 +596,72 @@ function renderAppForGuest() {
 /* ============================================================================
    3. GESTÃO DOS DADOS FINANCEIROS (SALÁRIO, DÍVIDA, DEADLINE)
    ============================================================================ */
-function loadUserFinanceData() {
+async function loadUserFinanceData() {
     if (!currentUser) return;
-    const key = STORAGE_KEYS.FINANCE_DATA + currentUser.id;
-    const raw = localStorage.getItem(key);
 
-    if (raw) {
+    let loaded = false;
+
+    // 1. Tenta carregar do Supabase se ativo
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
         try {
-            currentFinanceData = JSON.parse(raw);
-            document.getElementById('monthlySalary').value = currentFinanceData.salary || '';
-            document.getElementById('totalDebt').value = currentFinanceData.debt || '';
-            document.getElementById('debtDeadline').value = currentFinanceData.deadline || '';
-            document.getElementById('essentialExpenses').value = currentFinanceData.essentials || '';
-            calculateAndRenderMetrics();
-        } catch (e) {
-            console.error('Erro ao ler finanças:', e);
+            const { data, error } = await supabaseClient
+                .from('financial_records')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .maybeSingle();
+
+            if (data) {
+                currentFinanceData = {
+                    salary: parseFloat(data.monthly_salary) || 0,
+                    debt: parseFloat(data.total_debt) || 0,
+                    deadline: data.deadline || '',
+                    essentials: parseFloat(data.essential_expenses) || 0,
+                    updatedAt: data.updated_at
+                };
+                document.getElementById('monthlySalary').value = currentFinanceData.salary || '';
+                document.getElementById('totalDebt').value = currentFinanceData.debt || '';
+                document.getElementById('debtDeadline').value = currentFinanceData.deadline || '';
+                document.getElementById('essentialExpenses').value = currentFinanceData.essentials || '';
+                calculateAndRenderMetrics();
+                loaded = true;
+            }
+
+            // Carrega histórico de mensagens do chat se houver
+            loadChatHistoryFromSupabase();
+        } catch (err) {
+            console.warn('Erro ao carregar dados financeiros do Supabase:', err);
         }
-    } else {
-        // Preenche com uma deadline padrão (ex: daqui a 6 meses) para guiar o usuário
-        const defaultDeadline = new Date();
-        defaultDeadline.setMonth(defaultDeadline.getMonth() + 6);
-        const yyyy = defaultDeadline.getFullYear();
-        const mm = String(defaultDeadline.getMonth() + 1).padStart(2, '0');
-        const dd = String(defaultDeadline.getDate()).padStart(2, '0');
-        document.getElementById('debtDeadline').value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    // 2. Se não carregou do Supabase, tenta o LocalStorage
+    if (!loaded) {
+        const key = STORAGE_KEYS.FINANCE_DATA + currentUser.id;
+        const raw = localStorage.getItem(key);
+
+        if (raw) {
+            try {
+                currentFinanceData = JSON.parse(raw);
+                document.getElementById('monthlySalary').value = currentFinanceData.salary || '';
+                document.getElementById('totalDebt').value = currentFinanceData.debt || '';
+                document.getElementById('debtDeadline').value = currentFinanceData.deadline || '';
+                document.getElementById('essentialExpenses').value = currentFinanceData.essentials || '';
+                calculateAndRenderMetrics();
+            } catch (e) {
+                console.error('Erro ao ler finanças do LocalStorage:', e);
+            }
+        } else {
+            // Preenche com uma deadline padrão (ex: daqui a 6 meses) para guiar o usuário
+            const defaultDeadline = new Date();
+            defaultDeadline.setMonth(defaultDeadline.getMonth() + 6);
+            const yyyy = defaultDeadline.getFullYear();
+            const mm = String(defaultDeadline.getMonth() + 1).padStart(2, '0');
+            const dd = String(defaultDeadline.getDate()).padStart(2, '0');
+            document.getElementById('debtDeadline').value = `${yyyy}-${mm}-${dd}`;
+        }
     }
 }
 
-function handleSaveFinanceData(e) {
+async function handleSaveFinanceData(e) {
     e.preventDefault();
     if (!currentUser) return;
 
@@ -491,8 +683,33 @@ function handleSaveFinanceData(e) {
         updatedAt: new Date().toISOString()
     };
 
+    // 1. Sempre mantém cópia local em cache no LocalStorage
     const key = STORAGE_KEYS.FINANCE_DATA + currentUser.id;
     localStorage.setItem(key, JSON.stringify(currentFinanceData));
+
+    // 2. Salva no Supabase se ativo
+    if (typeof isSupabaseConfigured === 'function' && isSupabaseConfigured() && supabaseClient) {
+        try {
+            const { error } = await supabaseClient
+                .from('financial_records')
+                .upsert({
+                    user_id: currentUser.id,
+                    monthly_salary: salary,
+                    total_debt: debt,
+                    deadline: deadline,
+                    essential_expenses: essentials,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+            if (error) {
+                console.error('Erro ao salvar no Supabase:', error);
+            } else {
+                console.log('✅ Dados financeiros sincronizados na nuvem do Supabase.');
+            }
+        } catch (err) {
+            console.warn('Erro ao conectar ao Supabase durante salvamento:', err);
+        }
+    }
 
     calculateAndRenderMetrics();
     
@@ -785,6 +1002,18 @@ function generateSmartAIResponse(query) {
 }
 
 function appendUserMessage(text) {
+    renderUserBubble(text);
+    scrollChatToBottom();
+    persistChatMessage('user', text);
+}
+
+function appendAIMessage(htmlContent) {
+    renderAIBubble(htmlContent);
+    scrollChatToBottom();
+    persistChatMessage('ai', htmlContent);
+}
+
+function renderUserBubble(text) {
     const chatContainer = document.getElementById('chatMessages');
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble user';
@@ -795,10 +1024,9 @@ function appendUserMessage(text) {
         </div>
     `;
     chatContainer.appendChild(bubble);
-    scrollChatToBottom();
 }
 
-function appendAIMessage(htmlContent) {
+function renderAIBubble(htmlContent) {
     const chatContainer = document.getElementById('chatMessages');
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble ai';
@@ -809,7 +1037,54 @@ function appendAIMessage(htmlContent) {
         </div>
     `;
     chatContainer.appendChild(bubble);
-    scrollChatToBottom();
+}
+
+/**
+ * Salva a mensagem no Supabase de forma assíncrona
+ */
+function persistChatMessage(sender, message) {
+    if (!currentUser || typeof isSupabaseConfigured !== 'function' || !isSupabaseConfigured() || !supabaseClient) return;
+
+    supabaseClient
+        .from('chat_messages')
+        .insert({
+            user_id: currentUser.id,
+            sender: sender,
+            message: message
+        })
+        .then(({ error }) => {
+            if (error) console.warn('Erro ao persistir mensagem no Supabase:', error);
+        });
+}
+
+/**
+ * Carrega o histórico de mensagens da nuvem do Supabase
+ */
+async function loadChatHistoryFromSupabase() {
+    if (!currentUser || typeof isSupabaseConfigured !== 'function' || !isSupabaseConfigured() || !supabaseClient) return;
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('chat_messages')
+            .select('sender, message, created_at')
+            .eq('user_id', currentUser.id)
+            .order('created_at', { ascending: true });
+
+        if (data && data.length > 0) {
+            const chatContainer = document.getElementById('chatMessages');
+            chatContainer.innerHTML = '';
+            data.forEach(msg => {
+                if (msg.sender === 'user') {
+                    renderUserBubble(msg.message);
+                } else {
+                    renderAIBubble(msg.message);
+                }
+            });
+            scrollChatToBottom();
+        }
+    } catch (e) {
+        console.warn('Erro ao carregar histórico do chat do Supabase:', e);
+    }
 }
 
 function showTypingIndicator() {

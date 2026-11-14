@@ -23,6 +23,12 @@
             </div>
 
             <div class="nav-actions">
+                <!-- Sync Status Indicator -->
+                <div id="syncStatusPill" class="sync-pill local" title="Modo de Armazenamento: LocalStorage (Offline). Configure o Supabase para sincronizar em nuvem.">
+                    <span class="sync-dot"></span>
+                    <span id="syncStatusText" class="sync-text">Local</span>
+                </div>
+
                 <!-- Theme Toggle Button -->
                 <button id="themeToggleBtn" class="btn-icon" aria-label="Alternar tema" title="Alternar tema">
                     <span class="theme-icon light-icon">☀️</span>
@@ -353,6 +359,9 @@
         <p>© 2026 Gastei & Agora? — Transformando dívidas em metas possíveis. Cuide bem do seu dinheiro! 💰</p>
     </footer>
 
+    <!-- Supabase JS Client v2 & Configuration -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseConfig.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -200,6 +200,40 @@ body {
     box-shadow: 0 0 10px var(--accent-glow);
 }
 
+/* Sync Status Pill (Nuvem Supabase vs LocalStorage) */
+.sync-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    background-color: var(--bg-card-secondary);
+    border: 1px solid var(--border-color);
+    padding: 0.35rem 0.7rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: help;
+    transition: var(--transition);
+    user-select: none;
+}
+
+.sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+    transition: var(--transition);
+}
+
+.sync-pill.local .sync-dot {
+    background-color: var(--color-warning);
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.sync-pill.cloud .sync-dot {
+    background-color: var(--color-success);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+}
+
 /* ==========================================================================
    MODO DE PRIVACIDADE (Ocultação de Números com Revelação no Hover)
    ========================================================================== */
@@ -1239,7 +1273,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 
     .btn-icon .theme-text,
-    .btn-icon .privacy-text {
+    .btn-icon .privacy-text,
+    .sync-pill .sync-text {
         display: none;
     }
 
