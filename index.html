@@ -395,6 +395,63 @@
                             <div id="deadlineProgressBar" class="progress-bar-fill" style="width: 0%"></div>
                         </div>
                     </div>
+
+                    <!-- Calendário Financeiro com Lembretes de Pagamento -->
+                    <div class="calendar-card-section" id="calendarSection">
+                        <div class="calendar-header-bar">
+                            <div class="calendar-nav-controls">
+                                <button type="button" class="btn-cal-nav" id="prevMonthBtn" onclick="changeCalendarMonth(-1)" title="Mês anterior">◀</button>
+                                <h4 id="calendarMonthYearDisplay">Novembro 2026</h4>
+                                <button type="button" class="btn-cal-nav" id="nextMonthBtn" onclick="changeCalendarMonth(1)" title="Próximo mês">▶</button>
+                            </div>
+                            <div class="calendar-quick-actions">
+                                <button type="button" class="btn btn-outline btn-xs" onclick="goToTodayCalendar()" title="Ir para hoje">Hoje</button>
+                                <button type="button" class="btn btn-outline btn-xs" onclick="goToDeadlineCalendar()" title="Ver prazo final">Ver Deadline 🏁</button>
+                            </div>
+                        </div>
+
+                        <!-- Dias da semana -->
+                        <div class="calendar-weekdays">
+                            <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                        </div>
+
+                        <!-- Grade de Dias -->
+                        <div class="calendar-days-grid" id="calendarDaysGrid">
+                            <!-- Gerado dinamicamente -->
+                        </div>
+
+                        <!-- Painel de Notas da Data Selecionada -->
+                        <div class="calendar-note-panel" id="calendarNotePanel">
+                            <div class="note-panel-header">
+                                <div class="note-header-left">
+                                    <span class="note-panel-icon">📝</span>
+                                    <strong id="selectedDateTitle">Notas da Data</strong>
+                                </div>
+                                <span class="note-count-badge" id="selectedDateCountBadge">0 notas</span>
+                            </div>
+
+                            <div id="selectedDateNotesList" class="notes-list">
+                                <p class="empty-notes-hint">Clique em qualquer dia do calendário para ver ou adicionar lembretes de pagamento.</p>
+                            </div>
+
+                            <!-- Formulário para adicionar nota -->
+                            <form id="addNoteForm" class="add-note-inline-form" onsubmit="handleSaveCalendarNote(event)">
+                                <input type="hidden" id="selectedDateHidden">
+                                <div class="form-group-compact">
+                                    <input type="text" id="noteTextInput" placeholder="Descrição: ex. Pagar fatura Nubank, Parcela 1/3..." required autocomplete="off">
+                                </div>
+                                <div class="note-form-row">
+                                    <div class="input-prefix-wrapper compact">
+                                        <span class="prefix">R$</span>
+                                        <input type="number" id="noteValueInput" step="0.01" min="0" placeholder="Valor opcional">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <span>Adicionar Nota</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
 
             </div>

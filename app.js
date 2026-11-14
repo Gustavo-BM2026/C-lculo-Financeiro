@@ -11,7 +11,8 @@ const STORAGE_KEYS = {
     PRIVACY: 'gastei_agora_privacy',
     USERS: 'gastei_agora_users',
     CURRENT_USER: 'gastei_agora_session',
-    FINANCE_DATA: 'gastei_agora_finance_' // prefixo + userId
+    FINANCE_DATA: 'gastei_agora_finance_', // prefixo + userId
+    CALENDAR_NOTES: 'gastei_agora_calendar_notes_' // prefixo + userId
 };
 
 // Estado da Aplicação
@@ -22,6 +23,14 @@ let currentFinanceData = {
     debt: 0,
     deadline: '',
     essentials: 0
+};
+
+// Estado do Calendário de Pagamentos
+let calendarState = {
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(), // 0-indexed (0 = Jan, 11 = Dez)
+    selectedDateStr: null,
+    notes: {} // chave: 'YYYY-MM-DD' -> array de { id, text, value, isDeadline, createdAt }
 };
 
 /* ============================================================================
@@ -201,7 +210,7 @@ function setupPrivacyTouchSupport() {
     });
 }
 
-// Configura data mínima para o input do calendário (a partir de hoje)
+// Configura data mínima para o input do calendário (a partir de hoje) e ouvinte de atualização
 function setupDateConstraints() {
     const deadlineInput = document.getElementById('debtDeadline');
     if (deadlineInput) {
@@ -210,6 +219,21 @@ function setupDateConstraints() {
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         const dd = String(today.getDate()).padStart(2, '0');
         deadlineInput.min = `${yyyy}-${mm}-${dd}`;
+
+        // Sincroniza dinamicamente o calendário ao alterar a data no campo
+        deadlineInput.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val) {
+                currentFinanceData.deadline = val;
+                syncDeadlineWithCalendarNotes();
+                const [y, m] = val.split('-').map(Number);
+                calendarState.viewYear = y;
+                calendarState.viewMonth = m - 1;
+                calendarState.selectedDateStr = val;
+                renderCalendarGrid();
+                renderSelectedDateNotes();
+            }
+        });
     }
 }
 
@@ -743,6 +767,9 @@ async function loadUserFinanceData() {
             document.getElementById('debtDeadline').value = `${yyyy}-${mm}-${dd}`;
         }
     }
+
+    // Inicializa o calendário com notas e deadline do usuário
+    initCalendar();
 }
 
 async function handleSaveFinanceData(e) {
@@ -796,6 +823,9 @@ async function handleSaveFinanceData(e) {
     }
 
     calculateAndRenderMetrics();
+    syncDeadlineWithCalendarNotes();
+    renderCalendarGrid();
+    renderSelectedDateNotes();
     
     // Notificação breve para o usuário
     appendAIMessage(`Excelente, ${currentUser.name}! Seus dados foram salvos: Salário de <strong>${formatCurrency(salary)}</strong>, dívida de <strong>${formatCurrency(debt)}</strong> e deadline para <strong>${formatDateBR(deadline)}</strong>. Clique em "Gerar Diagnóstico Rápido" ou confira as metas calculadas ao lado!`);
@@ -1231,4 +1261,384 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/* ============================================================================
+   7. CALENDÁRIO INTERATIVO & NOTAS / LEMBRETES DE PAGAMENTO
+   ============================================================================ */
+
+/**
+ * Inicializa o calendário: carrega notas locais, sincroniza a deadline
+ * e renderiza o mês corrente e painel de notas.
+ */
+function initCalendar() {
+    loadCalendarNotes();
+
+    const todayStr = toISODateString(new Date());
+
+    // Se houver uma deadline cadastrada, sincroniza a nota da deadline
+    if (currentFinanceData.deadline) {
+        syncDeadlineWithCalendarNotes();
+        const [targetY, targetM] = currentFinanceData.deadline.split('-').map(Number);
+        calendarState.viewYear = targetY;
+        calendarState.viewMonth = targetM - 1;
+        calendarState.selectedDateStr = currentFinanceData.deadline;
+    } else {
+        const now = new Date();
+        calendarState.viewYear = now.getFullYear();
+        calendarState.viewMonth = now.getMonth();
+        calendarState.selectedDateStr = todayStr;
+    }
+
+    renderCalendarGrid();
+    renderSelectedDateNotes();
+}
+
+/**
+ * Formata um objeto Date local para string YYYY-MM-DD
+ */
+function toISODateString(d) {
+    if (!d || isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * Retorna o nome por extenso do mês em Português
+ */
+function getMonthNamePT(monthIdx) {
+    const months = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return months[monthIdx] || '';
+}
+
+/**
+ * Carrega as notas do LocalStorage para o usuário ativo (ou convidado)
+ */
+function loadCalendarNotes() {
+    const key = STORAGE_KEYS.CALENDAR_NOTES + (currentUser ? currentUser.id : 'guest');
+    const raw = localStorage.getItem(key);
+    if (raw) {
+        try {
+            calendarState.notes = JSON.parse(raw);
+        } catch (e) {
+            console.warn('Erro ao carregar notas do calendário:', e);
+            calendarState.notes = {};
+        }
+    } else {
+        calendarState.notes = {};
+    }
+}
+
+/**
+ * Salva as notas do calendário no LocalStorage
+ */
+function saveCalendarNotes() {
+    const key = STORAGE_KEYS.CALENDAR_NOTES + (currentUser ? currentUser.id : 'guest');
+    try {
+        localStorage.setItem(key, JSON.stringify(calendarState.notes));
+    } catch (e) {
+        console.error('Erro ao persistir notas do calendário:', e);
+    }
+}
+
+/**
+ * Sincroniza automaticamente a data de pagamento (deadline) como uma nota no calendário
+ */
+function syncDeadlineWithCalendarNotes() {
+    // 1. Remove qualquer nota de deadline automática anterior de todas as datas
+    for (const dateKey in calendarState.notes) {
+        if (Array.isArray(calendarState.notes[dateKey])) {
+            calendarState.notes[dateKey] = calendarState.notes[dateKey].filter(n => !n.isDeadline);
+            if (calendarState.notes[dateKey].length === 0) {
+                delete calendarState.notes[dateKey];
+            }
+        }
+    }
+
+    // 2. Se houver deadline configurada, adiciona a nota oficial de quitação
+    const deadlineDate = currentFinanceData.deadline;
+    if (deadlineDate) {
+        if (!calendarState.notes[deadlineDate]) {
+            calendarState.notes[deadlineDate] = [];
+        }
+
+        const deadlineNote = {
+            id: 'deadline_official_' + deadlineDate,
+            text: '🏁 Quitação da Dívida (Deadline Oficial)',
+            value: currentFinanceData.debt || 0,
+            isDeadline: true,
+            createdAt: new Date().toISOString()
+        };
+
+        // Insere a nota no início da lista para destaque
+        calendarState.notes[deadlineDate].unshift(deadlineNote);
+    }
+
+    saveCalendarNotes();
+}
+
+/**
+ * Renderiza os dias do mês na grade do calendário
+ */
+function renderCalendarGrid() {
+    const gridEl = document.getElementById('calendarDaysGrid');
+    const displayEl = document.getElementById('calendarMonthYearDisplay');
+    if (!gridEl || !displayEl) return;
+
+    const { viewYear, viewMonth, selectedDateStr } = calendarState;
+
+    // Atualiza cabeçalho de navegação (Ex: Novembro 2026)
+    displayEl.textContent = `${getMonthNamePT(viewMonth)} ${viewYear}`;
+
+    // Primeiro dia do mês atual e quantidade de dias
+    const firstDayDate = new Date(viewYear, viewMonth, 1);
+    const startingDayOfWeek = firstDayDate.getDay(); // 0 = Domingo, 6 = Sábado
+    const daysInCurrentMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
+
+    const todayStr = toISODateString(new Date());
+    const deadlineStr = currentFinanceData.deadline || '';
+
+    let html = '';
+
+    // 1. Dias do mês anterior para preencher o início da semana
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        const dayNum = daysInPrevMonth - i;
+        const prevMonthIdx = viewMonth === 0 ? 11 : viewMonth - 1;
+        const prevYear = viewMonth === 0 ? viewYear - 1 : viewYear;
+        const dateStr = `${prevYear}-${String(prevMonthIdx + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+
+        html += `
+            <div class="cal-day other-month" onclick="selectCalendarDate('${dateStr}', true)">
+                <span class="day-number">${dayNum}</span>
+                <div class="day-indicators"></div>
+            </div>
+        `;
+    }
+
+    // 2. Dias do mês atual
+    for (let day = 1; day <= daysInCurrentMonth; day++) {
+        const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isToday = dateStr === todayStr;
+        const isDeadline = dateStr === deadlineStr;
+        const isSelected = dateStr === selectedDateStr;
+        const notes = calendarState.notes[dateStr] || [];
+        const hasNotes = notes.length > 0;
+
+        const classList = ['cal-day'];
+        if (isToday) classList.push('today');
+        if (isDeadline) classList.push('deadline');
+        if (isSelected) classList.push('selected');
+        if (hasNotes) classList.push('has-notes');
+
+        // Indicadores (bandeira da deadline e ponto de lembretes)
+        let indicatorsHtml = '';
+        if (isDeadline) {
+            indicatorsHtml += `<span class="indicator-flag" title="Data Limite de Pagamento (Deadline)">🏁</span>`;
+        }
+        if (hasNotes && (!isDeadline || notes.length > 1)) {
+            const count = isDeadline ? notes.length - 1 : notes.length;
+            indicatorsHtml += `<span class="indicator-dot" title="${count} nota(s) de pagamento"></span>`;
+        }
+
+        html += `
+            <div class="${classList.join(' ')}" onclick="selectCalendarDate('${dateStr}')" title="${isDeadline ? 'Data de quitação da dívida' : ''}">
+                <span class="day-number">${day}</span>
+                <div class="day-indicators">${indicatorsHtml}</div>
+            </div>
+        `;
+    }
+
+    // 3. Dias do próximo mês para completar a última semana
+    const totalCells = startingDayOfWeek + daysInCurrentMonth;
+    const remainingCells = (7 - (totalCells % 7)) % 7;
+    for (let nextDay = 1; nextDay <= remainingCells; nextDay++) {
+        const nextMonthIdx = viewMonth === 11 ? 0 : viewMonth + 1;
+        const nextYear = viewMonth === 11 ? viewYear + 1 : viewYear;
+        const dateStr = `${nextYear}-${String(nextMonthIdx + 1).padStart(2, '0')}-${String(nextDay).padStart(2, '0')}`;
+
+        html += `
+            <div class="cal-day other-month" onclick="selectCalendarDate('${dateStr}', true)">
+                <span class="day-number">${nextDay}</span>
+                <div class="day-indicators"></div>
+            </div>
+        `;
+    }
+
+    gridEl.innerHTML = html;
+}
+
+/**
+ * Seleciona uma data no calendário e exibe suas notas
+ */
+function selectCalendarDate(dateStr, fromOtherMonth = false) {
+    if (!dateStr) return;
+
+    calendarState.selectedDateStr = dateStr;
+
+    if (fromOtherMonth) {
+        const [y, m] = dateStr.split('-').map(Number);
+        calendarState.viewYear = y;
+        calendarState.viewMonth = m - 1;
+    }
+
+    renderCalendarGrid();
+    renderSelectedDateNotes();
+}
+
+/**
+ * Renderiza o painel de notas da data selecionada
+ */
+function renderSelectedDateNotes() {
+    const titleEl = document.getElementById('selectedDateTitle');
+    const countBadgeEl = document.getElementById('selectedDateCountBadge');
+    const notesListEl = document.getElementById('selectedDateNotesList');
+    const hiddenDateEl = document.getElementById('selectedDateHidden');
+
+    if (!notesListEl) return;
+
+    const dateStr = calendarState.selectedDateStr || toISODateString(new Date());
+    calendarState.selectedDateStr = dateStr;
+
+    if (hiddenDateEl) hiddenDateEl.value = dateStr;
+
+    const todayStr = toISODateString(new Date());
+    const isToday = dateStr === todayStr;
+    const isDeadline = dateStr === (currentFinanceData.deadline || '');
+
+    let dateLabel = formatDateBR(dateStr);
+    if (isToday) dateLabel += ' (Hoje)';
+    if (isDeadline) dateLabel += ' 🏁';
+
+    if (titleEl) titleEl.textContent = `Notas de ${dateLabel}`;
+
+    const notes = calendarState.notes[dateStr] || [];
+    if (countBadgeEl) {
+        countBadgeEl.textContent = `${notes.length} nota${notes.length === 1 ? '' : 's'}`;
+    }
+
+    if (notes.length === 0) {
+        notesListEl.innerHTML = `
+            <p class="empty-notes-hint">
+                Nenhum lembrete para esta data. Digite uma descrição abaixo para adicionar notas ou parcelas de pagamento.
+            </p>
+        `;
+        return;
+    }
+
+    notesListEl.innerHTML = notes.map(note => `
+        <div class="note-item ${note.isDeadline ? 'is-deadline' : ''}">
+            <div class="note-item-content">
+                <span class="note-item-text">${escapeHtml(note.text)}</span>
+                ${note.value ? `<span class="note-item-amount">${formatCurrency(note.value)}</span>` : ''}
+            </div>
+            ${!note.isDeadline ? `
+                <button type="button" class="note-item-delete" onclick="handleDeleteCalendarNote('${dateStr}', '${note.id}')" title="Excluir este lembrete">
+                    🗑️
+                </button>
+            ` : `<span title="Lembrete automático sincronizado com a deadline" style="font-size: 0.85rem; cursor: help;">🔒</span>`}
+        </div>
+    `).join('');
+}
+
+/**
+ * Salva uma nova nota/lembrete para a data selecionada
+ */
+function handleSaveCalendarNote(event) {
+    if (event) event.preventDefault();
+
+    const dateStr = document.getElementById('selectedDateHidden')?.value || calendarState.selectedDateStr;
+    const textInput = document.getElementById('noteTextInput');
+    const valInput = document.getElementById('noteValueInput');
+
+    if (!dateStr || !textInput) return;
+
+    const text = textInput.value.trim();
+    if (!text) return;
+
+    const val = parseFloat(valInput.value) || null;
+
+    if (!calendarState.notes[dateStr]) {
+        calendarState.notes[dateStr] = [];
+    }
+
+    const newNote = {
+        id: 'note_' + Date.now(),
+        text: text,
+        value: val,
+        isDeadline: false,
+        createdAt: new Date().toISOString()
+    };
+
+    calendarState.notes[dateStr].push(newNote);
+    saveCalendarNotes();
+
+    // Limpa os campos
+    textInput.value = '';
+    if (valInput) valInput.value = '';
+
+    renderCalendarGrid();
+    renderSelectedDateNotes();
+}
+
+/**
+ * Exclui uma nota manual do calendário
+ */
+function handleDeleteCalendarNote(dateStr, noteId) {
+    if (!calendarState.notes[dateStr]) return;
+
+    calendarState.notes[dateStr] = calendarState.notes[dateStr].filter(n => n.id !== noteId);
+    if (calendarState.notes[dateStr].length === 0) {
+        delete calendarState.notes[dateStr];
+    }
+
+    saveCalendarNotes();
+    renderCalendarGrid();
+    renderSelectedDateNotes();
+}
+
+/**
+ * Altera o mês de visualização do calendário (+1 ou -1)
+ */
+function changeCalendarMonth(delta) {
+    calendarState.viewMonth += delta;
+    if (calendarState.viewMonth < 0) {
+        calendarState.viewMonth = 11;
+        calendarState.viewYear--;
+    } else if (calendarState.viewMonth > 11) {
+        calendarState.viewMonth = 0;
+        calendarState.viewYear++;
+    }
+    renderCalendarGrid();
+}
+
+/**
+ * Vai diretamente para o dia de hoje no calendário
+ */
+function goToTodayCalendar() {
+    const now = new Date();
+    calendarState.viewYear = now.getFullYear();
+    calendarState.viewMonth = now.getMonth();
+    selectCalendarDate(toISODateString(now));
+}
+
+/**
+ * Vai diretamente para a data da deadline de pagamento
+ */
+function goToDeadlineCalendar() {
+    if (!currentFinanceData.deadline) {
+        alert('Você ainda não definiu uma data de quitação (deadline). Selecione uma data no formulário acima.');
+        document.getElementById('debtDeadline')?.focus();
+        return;
+    }
+
+    const [y, m] = currentFinanceData.deadline.split('-').map(Number);
+    calendarState.viewYear = y;
+    calendarState.viewMonth = m - 1;
+    selectCalendarDate(currentFinanceData.deadline);
 }
