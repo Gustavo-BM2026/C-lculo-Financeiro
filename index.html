@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gastei & Agora? | Gestor de Dívidas & Consultor IA</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <span class="brand-icon">💳</span>
+                <div class="brand-text">
+                    <h1>Gastei & Agora?</h1>
+                    <span class="brand-tagline">Recuperação Financeira Inteligente</span>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <!-- Theme Toggle Button -->
+                <button id="themeToggleBtn" class="btn-icon" aria-label="Alternar tema" title="Alternar tema">
+                    <span class="theme-icon light-icon">☀️</span>
+                    <span class="theme-icon dark-icon">🌙</span>
+                    <span class="theme-text">Modo Claro</span>
+                </button>
+
+                <!-- Privacy Toggle Button (Ocultar/Mostrar Valores) -->
+                <button id="privacyToggleBtn" class="btn-icon" aria-label="Ocultar ou mostrar números das informações" title="Ocultar valores das informações (passe o mouse para ver)">
+                    <span class="privacy-icon eye-open">👁️</span>
+                    <span class="privacy-icon eye-closed hidden">🙈</span>
+                    <span class="privacy-text">Ocultar Valores</span>
+                </button>
+
+                <!-- User Session Pill -->
+                <div id="userPill" class="user-pill hidden">
+                    <span class="avatar-icon">👤</span>
+                    <span id="userNameDisplay" class="user-name">Usuário</span>
+                    <button id="logoutBtn" class="btn-logout" title="Sair da conta">Sair</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-wrapper">
+
+        <!-- SECTION: Boas-vindas / Apresentação -->
+        <section class="welcome-banner">
+            <div class="welcome-content">
+                <div class="badge-humor">😅 "Gastou no impulso? Calma, a gente resolve junto!"</div>
+                <h2>Olá, amigo consumista! Vamos colocar essa dívida nos trilhos?</h2>
+                <p>
+                    Sabemos como é: uma comprinha ali, um parcelamento acolá e, de repente, o estrago está feito. 
+                    Sem pânico! O primeiro passo para sair do vermelho é saber exatamente o tamanho do monstro 
+                    e traçar uma data limite (<em>deadline</em>) com ajuda da nossa <strong>IA Financeira</strong>.
+                </p>
+            </div>
+        </section>
+
+        <!-- SECTION: Autenticação (Login / Cadastro) -->
+        <section id="authSection" class="auth-card-wrapper">
+            <div class="card auth-card">
+                <div class="auth-tabs">
+                    <button id="tabLogin" class="tab-btn active" onclick="switchAuthTab('login')">Entrar</button>
+                    <button id="tabRegister" class="tab-btn" onclick="switchAuthTab('register')">Criar Conta</button>
+                </div>
+
+                <!-- Formulário de Login -->
+                <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+                    <div class="form-header">
+                        <h3>Bem-vindo de volta!</h3>
+                        <p>Entre para continuar gerenciando sua dívida e recebendo auxílio da IA.</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loginEmail">E-mail</label>
+                        <input type="email" id="loginEmail" placeholder="ex: usuario@outlook.com" required autocomplete="email">
+                        <small class="field-hint">Deve incluir o @ e o provedor (ex: @outlook.com, @gmail.com)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Senha</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="loginPassword" placeholder="Sua senha cadastrada" required autocomplete="current-password">
+                            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+                        </div>
+                    </div>
+
+                    <div id="loginError" class="alert-msg error hidden"></div>
+
+                    <button type="submit" class="btn btn-primary btn-block">Acessar Meu Painel</button>
+                    <p class="auth-switch-hint">Não tem conta ainda? <a href="#" onclick="switchAuthTab('register'); return false;">Cadastre-se grátis</a></p>
+                </form>
+
+                <!-- Formulário de Cadastro -->
+                <form id="registerForm" class="auth-form hidden" onsubmit="handleRegister(event)">
+                    <div class="form-header">
+                        <h3>Crie sua conta</h3>
+                        <p>Leva menos de 1 minuto e seus dados ficam salvos com segurança.</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regName">Seu Nome ou Apelido</label>
+                        <input type="text" id="regName" placeholder="Como quer ser chamado?" required autocomplete="name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regEmail">E-mail com Provedor</label>
+                        <input type="email" id="regEmail" placeholder="ex: seuemail@outlook.com" required autocomplete="email">
+                        <small class="field-hint">Obrigatório conter '@' e o provedor (ex: outlook.com, gmail.com, etc.)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="regPassword">Crie uma Senha Forte</label>
+                        <div class="password-input-wrapper">
+                            <input type="password" id="regPassword" placeholder="Digite sua senha" required autocomplete="new-password" oninput="checkPasswordRequirements(this.value)">
+                            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('regPassword', this)" aria-label="Mostrar ou ocultar senha" title="Mostrar/Ocultar senha">👁️</button>
+                        </div>
+
+                        <!-- Requisitos Visuais de Senha -->
+                        <div class="password-requirements" id="passwordRequirements">
+                            <span class="req-title">A senha deve conter:</span>
+                            <ul class="req-list">
+                                <li id="reqLength" class="req-item invalid">
+                                    <span class="req-icon">✕</span>
+                                    <span>Pelo menos 6 caracteres</span>
+                                </li>
+                                <li id="reqUpper" class="req-item invalid">
+                                    <span class="req-icon">✕</span>
+                                    <span>Uma letra maiúscula (A-Z)</span>
+                                </li>
+                                <li id="reqLower" class="req-item invalid">
+                                    <span class="req-icon">✕</span>
+                                    <span>Uma letra minúscula (a-z)</span>
+                                </li>
+                                <li id="reqNumber" class="req-item invalid">
+                                    <span class="req-icon">✕</span>
+                                    <span>Pelo menos um número (0-9)</span>
+                                </li>
+                                <li id="reqSpecial" class="req-item invalid">
+                                    <span class="req-icon">✕</span>
+                                    <span>Pelo menos um caractere especial (!@#$%...)</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="registerError" class="alert-msg error hidden"></div>
+                    <div id="registerSuccess" class="alert-msg success hidden"></div>
+
+                    <button type="submit" class="btn btn-primary btn-block">Criar Conta & Começar</button>
+                    <p class="auth-switch-hint">Já possui uma conta? <a href="#" onclick="switchAuthTab('login'); return false;">Faça login</a></p>
+                </form>
+            </div>
+        </section>
+
+        <!-- SECTION: Painel Principal da Planilha e Gestão (Visível após login) -->
+        <section id="dashboardSection" class="dashboard-section hidden">
+            
+            <!-- Saudação Personalizada -->
+            <div class="user-greeting-banner">
+                <div class="greeting-text">
+                    <h2>Olá, <span id="salutationName">Guerreiro</span>! 👋</h2>
+                    <p id="greetingSubtitle">Atualize seus dados abaixo e defina seu deadline. Nossa IA cuidará do resto!</p>
+                </div>
+                <div class="status-chip" id="debtHealthBadge">
+                    <span class="status-indicator"></span>
+                    <span id="debtHealthText">Aguardando dados...</span>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                
+                <!-- COLUNA 1: Formulário de Dados e Metas -->
+                <div class="card data-card">
+                    <div class="card-header">
+                        <div class="icon-circle">📊</div>
+                        <div>
+                            <h3>Minha Situação Financeira</h3>
+                            <p class="card-subtitle">Informe seu salário, sua dívida e o prazo limite.</p>
+                        </div>
+                    </div>
+
+                    <form id="financeForm" onsubmit="handleSaveFinanceData(event)">
+                        
+                        <div class="form-group">
+                            <label for="monthlySalary">
+                                <span>Salário Líquido Mensal</span>
+                                <span class="help-tooltip" title="Quanto você realmente recebe na conta todo mês">ℹ️</span>
+                            </label>
+                            <div class="input-prefix-wrapper">
+                                <span class="prefix">R$</span>
+                                <input type="number" id="monthlySalary" step="0.01" min="0" placeholder="Ex: 3500.00" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="totalDebt">
+                                <span>Tamanho Total da Dívida</span>
+                                <span class="help-tooltip" title="Soma de cartões, empréstimos, cheque especial e pendências">ℹ️</span>
+                            </label>
+                            <div class="input-prefix-wrapper">
+                                <span class="prefix">R$</span>
+                                <input type="number" id="totalDebt" step="0.01" min="0" placeholder="Ex: 8500.00" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="debtDeadline">
+                                <span>Calendário: Deadline para Quitar</span>
+                                <span class="help-tooltip" title="Escolha a data limite em que você quer estar 100% livre dessa dívida">📅</span>
+                            </label>
+                            <input type="date" id="debtDeadline" required>
+                            <small class="field-hint">Defina até quando você precisa quitar todo esse valor.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="essentialExpenses">
+                                <span>Gastos Essenciais Fixos (Opcional)</span>
+                                <span class="help-tooltip" title="Aluguel, contas de luz/água, alimentação básica">ℹ️</span>
+                            </label>
+                            <div class="input-prefix-wrapper">
+                                <span class="prefix">R$</span>
+                                <input type="number" id="essentialExpenses" step="0.01" min="0" placeholder="Ex: 1800.00">
+                            </div>
+                            <small class="field-hint">Ajuda a IA a calcular quanto realmente sobra do seu salário.</small>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">
+                            💾 Atualizar e Calcular Plano
+                        </button>
+                    </form>
+                </div>
+
+                <!-- COLUNA 2: Resumo Matemático e Indicadores -->
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <div class="icon-circle">🎯</div>
+                        <div>
+                            <h3>Diagnóstico & Metas de Pagamento</h3>
+                            <p class="card-subtitle">Como sua dívida se desdobra até a data final.</p>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <span class="metric-label">Dívida Total</span>
+                            <span class="metric-value text-danger privacy-value" id="metricTotalDebt" title="Passe o mouse para revelar">R$ 0,00</span>
+                        </div>
+
+                        <div class="metric-box">
+                            <span class="metric-label">Tempo Restante</span>
+                            <span class="metric-value" id="metricTimeRemaining">--</span>
+                        </div>
+
+                        <div class="metric-box highlight">
+                            <span class="metric-label">Meta de Pagamento Mensal</span>
+                            <span class="metric-value text-accent privacy-value" id="metricMonthlyTarget" title="Passe o mouse para revelar">R$ 0,00</span>
+                            <span class="metric-sub privacy-value" id="metricSalaryPercent" title="Passe o mouse para revelar">0% do seu salário</span>
+                        </div>
+
+                        <div class="metric-box">
+                            <span class="metric-label">Meta Diária de Economia</span>
+                            <span class="metric-value privacy-value" id="metricDailyTarget" title="Passe o mouse para revelar">R$ 0,00 / dia</span>
+                        </div>
+                    </div>
+
+                    <!-- Alerta de Viabilidade -->
+                    <div id="feasibilityAlert" class="feasibility-box info">
+                        <div class="alert-icon">💡</div>
+                        <div class="alert-content">
+                            <strong id="feasibilityTitle">Preencha seus dados</strong>
+                            <p id="feasibilityMessage">Insira seu salário, sua dívida e escolha a data no calendário ao lado para ver sua rota de quitação.</p>
+                        </div>
+                    </div>
+
+                    <!-- Barra de Progresso Temporal -->
+                    <div class="deadline-progress-container">
+                        <div class="progress-labels">
+                            <span>Hoje: <strong id="lblCurrentDate">--</strong></span>
+                            <span>Deadline: <strong id="lblTargetDate">--</strong></span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="deadlineProgressBar" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- SECTION: IA Financeira - Consultoria & Chatbot -->
+            <div class="card ai-card">
+                <div class="ai-header">
+                    <div class="ai-profile">
+                        <div class="ai-avatar">🤖</div>
+                        <div>
+                            <h3>FinAI - Seu Mentor Antidívida</h3>
+                            <p>Especialista em conter impulsos consumistas e estruturar pagamentos viáveis</p>
+                        </div>
+                    </div>
+                    <div class="ai-actions">
+                        <button class="btn btn-outline btn-sm" onclick="triggerAutomaticAIDiagnosis()">
+                            ⚡ Gerar Diagnóstico Rápido
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chat com a IA -->
+                <div class="chat-wrapper">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="chat-bubble ai">
+                            <div class="bubble-avatar">🤖</div>
+                            <div class="bubble-text">
+                                <p>Olá! Eu sou a <strong>FinAI</strong>. Sei como é difícil olhar para a fatura quando gastamos mais do que devíamos. 
+                                Não se culpe, o importante é que você deu o primeiro passo.</p>
+                                <p>Preencha os campos de salário, dívida e prazo acima e clique em <em>"Gerar Diagnóstico Rápido"</em> ou pergunte o que quiser aqui no chat!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sugestões de Perguntas Rápidas -->
+                    <div class="chat-quick-actions">
+                        <span class="quick-title">Sugestões rápidas:</span>
+                        <button class="chip-btn" onclick="sendQuickPrompt('Como devo priorizar minhas dívidas?')">Priorizar dívidas</button>
+                        <button class="chip-btn" onclick="sendQuickPrompt('O que fazer para parar de gastar por impulso?')">Controlar impulso</button>
+                        <button class="chip-btn" onclick="sendQuickPrompt('Minha parcela está muito pesada para o meu salário. O que fazer?')">Parcela muito alta?</button>
+                        <button class="chip-btn" onclick="sendQuickPrompt('Compensa pegar empréstimo para quitar o cartão?')">Empréstimo compensa?</button>
+                    </div>
+
+                    <!-- Input de Chat -->
+                    <form id="chatForm" class="chat-input-bar" onsubmit="handleSendChatMessage(event)">
+                        <input type="text" id="chatUserInput" placeholder="Pergunte à FinAI: 'Como organizar meus gastos?', 'Devo renegociar?'..." autocomplete="off">
+                        <button type="submit" class="btn btn-primary btn-chat">
+                            <span>Enviar</span>
+                            <span class="send-icon">➤</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>© 2026 Gastei & Agora? — Transformando dívidas em metas possíveis. Cuide bem do seu dinheiro! 💰</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
