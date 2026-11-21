@@ -1163,6 +1163,7 @@ function calculateAndRenderMetrics() {
         metricMonthlyTarget.textContent = formatCurrency(0);
         metricDailyTarget.textContent = 'R$ 0,00 / dia';
         metricSalaryPercent.textContent = '0% do seu salário';
+        renderRemindersTimeline();
         return;
     }
 
@@ -1272,6 +1273,9 @@ function calculateAndRenderMetrics() {
         debtHealthBadge.className = 'status-chip critical';
         debtHealthText.textContent = 'Risco Alto de Asfixia';
     }
+
+    renderRemindersTimeline();
+    checkUpcomingDebtReminders();
 }
 
 /* ============================================================================
@@ -1708,40 +1712,178 @@ function saveCalendarNotes() {
     }
 }
 
+/* ============================================================================
+   MARCOS DE LEMBRETES DE PAGAMENTO (1 MÊS, 15 DIAS, 1 SEMANA, 3 DIAS E ÚLTIMO DIA)
+   ============================================================================ */
+
+const REMINDER_MILESTONES = [
+    {
+        id: 'm_30d',
+        daysBefore: 30,
+        label: '1 mês antes',
+        badgeClass: 'badge-month',
+        title: '⏳ Falta 1 mês para o pagamento!',
+        getMessage: (debt, dateBR) => `Seu deadline de ${formatCurrency(debt)} vence em 30 dias (${dateBR}). Mantenha sua reserva separada! 💰`,
+        calNote: '⏳ Lembrete: Falta 1 mês para o Deadline da Dívida'
+    },
+    {
+        id: 'm_15d',
+        daysBefore: 15,
+        label: '15 dias antes',
+        badgeClass: 'badge-15d',
+        title: '⏳ Faltam 15 dias para o vencimento!',
+        getMessage: (debt, dateBR) => `Faltam apenas duas semanas para a quitação (${dateBR}). Revise seus gastos do mês! 💳`,
+        calNote: '⏳ Lembrete: Faltam 15 dias para o Deadline da Dívida'
+    },
+    {
+        id: 'm_7d',
+        daysBefore: 7,
+        label: '1 semana antes',
+        badgeClass: 'badge-7d',
+        title: '⚠️ Falta 1 semana para quitar a dívida!',
+        getMessage: (debt, dateBR) => `Atenção: faltam 7 dias para o pagamento de ${formatCurrency(debt)} em ${dateBR}. Não comprometa seu saldo! 🚨`,
+        calNote: '⚠️ Lembrete: Falta 1 semana para o Deadline da Dívida'
+    },
+    {
+        id: 'm_3d',
+        daysBefore: 3,
+        label: 'Em 3 dias',
+        badgeClass: 'badge-3d',
+        title: '🚨 Alerta Urgente: Faltam 3 dias!',
+        getMessage: (debt, dateBR) => `Reta final! Faltam apenas 3 dias para quitar seu compromisso financeiro (${dateBR}). ⏰`,
+        calNote: '🚨 Alerta Urgente: Faltam 3 dias para o Deadline da Dívida'
+    },
+    {
+        id: 'm_0d',
+        daysBefore: 0,
+        label: 'Último dia (Hoje)',
+        badgeClass: 'badge-0d',
+        title: '🏁 Chegou o grande dia: Quitação da Dívida!',
+        getMessage: (debt, dateBR) => `Hoje (${dateBR}) é o dia oficial do pagamento de ${formatCurrency(debt)}! Parabéns pelo foco na sua liberdade financeira! 🎉`,
+        calNote: '🏁 Quitação da Dívida (Deadline Oficial)'
+    }
+];
+
 /**
- * Sincroniza automaticamente a data de pagamento (deadline) como uma nota no calendário
+ * Calcula as datas exatas dos 5 marcos de lembretes com base na deadline
+ */
+function getCalculatedMilestones(deadlineStr) {
+    if (!deadlineStr) return [];
+
+    const [tY, tM, tD] = deadlineStr.split('-').map(Number);
+    const targetDate = new Date(tY, tM - 1, tD);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = toISODateString(today);
+
+    return REMINDER_MILESTONES.map((m) => {
+        const mDate = new Date(targetDate);
+        mDate.setDate(mDate.getDate() - m.daysBefore);
+        mDate.setHours(0, 0, 0, 0);
+
+        const mDateStr = toISODateString(mDate);
+        const diffFromToday = Math.ceil((mDate - today) / (1000 * 60 * 60 * 24));
+        const isToday = (mDateStr === todayStr);
+        const isPast = (diffFromToday < 0);
+
+        return {
+            ...m,
+            dateObj: mDate,
+            dateStr: mDateStr,
+            dateBR: formatDateBR(mDate),
+            diffFromToday,
+            isToday,
+            isPast
+        };
+    });
+}
+
+/**
+ * Renderiza os 5 lembretes no card de cronograma
+ */
+function renderRemindersTimeline() {
+    const listEl = document.getElementById('remindersTimelineList');
+    if (!listEl) return;
+
+    const { deadline, debt } = currentFinanceData;
+    if (!deadline) {
+        listEl.innerHTML = '<p class="text-muted" style="grid-column: 1/-1; text-align: center; padding: 1rem 0;">Selecione uma data no formulário para visualizar os lembretes automáticos agendados.</p>';
+        return;
+    }
+
+    const milestones = getCalculatedMilestones(deadline);
+
+    listEl.innerHTML = milestones.map((m) => {
+        let statusText = '';
+        let statusClass = '';
+
+        if (m.isToday) {
+            statusText = '🔔 Alerta Ativo Hoje!';
+            statusClass = 'status-today';
+        } else if (m.isPast) {
+            statusText = '✅ Data já passou';
+            statusClass = 'status-past';
+        } else {
+            statusText = `⏳ Em ${m.diffFromToday} dia(s)`;
+            statusClass = 'status-future';
+        }
+
+        return `
+            <div class="reminder-milestone-item ${m.isToday ? 'active-today' : ''} ${m.isPast ? 'past' : ''}">
+                <span class="milestone-badge ${m.badgeClass}">${m.label}</span>
+                <span class="milestone-date">${m.dateBR}</span>
+                <span class="milestone-status ${statusClass}">${statusText}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Sincroniza a deadline e os 5 marcos de lembretes como notas no calendário
  */
 function syncDeadlineWithCalendarNotes() {
-    // 1. Remove qualquer nota de deadline automática anterior de todas as datas
+    // 1. Remove qualquer nota de deadline e marcos automáticos anteriores
     for (const dateKey in calendarState.notes) {
         if (Array.isArray(calendarState.notes[dateKey])) {
-            calendarState.notes[dateKey] = calendarState.notes[dateKey].filter(n => !n.isDeadline);
+            calendarState.notes[dateKey] = calendarState.notes[dateKey].filter(
+                n => !n.isDeadline && !n.isMilestoneReminder
+            );
             if (calendarState.notes[dateKey].length === 0) {
                 delete calendarState.notes[dateKey];
             }
         }
     }
 
-    // 2. Se houver deadline configurada, adiciona a nota oficial de quitação
+    // 2. Se houver deadline configurada, adiciona as notas dos 5 lembretes
     const deadlineDate = currentFinanceData.deadline;
     if (deadlineDate) {
-        if (!calendarState.notes[deadlineDate]) {
-            calendarState.notes[deadlineDate] = [];
-        }
+        const milestones = getCalculatedMilestones(deadlineDate);
 
-        const deadlineNote = {
-            id: 'deadline_official_' + deadlineDate,
-            text: '🏁 Quitação da Dívida (Deadline Oficial)',
-            value: currentFinanceData.debt || 0,
-            isDeadline: true,
-            createdAt: new Date().toISOString()
-        };
+        milestones.forEach((m) => {
+            const dateKey = m.dateStr;
+            if (!calendarState.notes[dateKey]) {
+                calendarState.notes[dateKey] = [];
+            }
 
-        // Insere a nota no início da lista para destaque
-        calendarState.notes[deadlineDate].unshift(deadlineNote);
+            const noteObj = {
+                id: `milestone_${m.id}_${dateKey}`,
+                text: m.calNote,
+                value: m.daysBefore === 0 ? (currentFinanceData.debt || 0) : 0,
+                isDeadline: (m.daysBefore === 0),
+                isMilestoneReminder: true,
+                milestoneId: m.id,
+                createdAt: new Date().toISOString()
+            };
+
+            // Insere a nota no início da lista para destaque
+            calendarState.notes[dateKey].unshift(noteObj);
+        });
     }
 
     saveCalendarNotes();
+    renderRemindersTimeline();
 }
 
 /**
@@ -3004,4 +3146,130 @@ function handleAppBackgrounded() {
             }).catch(() => {});
         }
     }
+}
+
+/* ============================================================================
+   11. DISPARADOR DE NOTIFICAÇÕES DOS MARCOS DA DÍVIDA (1 MÊS, 15 DIAS, 7 DIAS, 3 DIAS E ÚLTIMO DIA)
+   ============================================================================ */
+
+/**
+ * Verifica se a data atual da máquina coincide com algum dos 5 marcos de lembrete e dispara a notificação
+ */
+async function checkUpcomingDebtReminders() {
+    const { deadline, debt } = currentFinanceData;
+    if (!deadline || !debt || debt <= 0) return;
+
+    const milestones = getCalculatedMilestones(deadline);
+    const todayMilestone = milestones.find(m => m.isToday);
+
+    if (!todayMilestone) return;
+
+    // Chave de verificação para evitar envio duplicado no mesmo dia
+    const NOTIFIED_KEY = 'gastei_notified_milestones';
+    let notifiedMap = {};
+    try {
+        notifiedMap = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '{}');
+    } catch (e) {
+        notifiedMap = {};
+    }
+
+    const checkKey = `${todayMilestone.id}_${todayMilestone.dateStr}`;
+    if (notifiedMap[checkKey]) {
+        // Já notificado hoje para este marco
+        return;
+    }
+
+    // Marca como notificado
+    notifiedMap[checkKey] = new Date().toISOString();
+    try {
+        localStorage.setItem(NOTIFIED_KEY, JSON.stringify(notifiedMap));
+    } catch (e) {}
+
+    // Dispara a notificação oficial
+    const title = todayMilestone.title;
+    const body = todayMilestone.getMessage(debt, formatDateBR(deadline));
+
+    await dispatchMilestoneNotification(title, body, todayMilestone.id);
+    await logActivity('DEBT_MILESTONE_ALERT', `Lembrete de vencimento disparado (${todayMilestone.label}) para ${formatDateBR(deadline)}`, { milestone: todayMilestone.id, deadline });
+}
+
+/**
+ * Disparador unificado para notificações de marco de pagamento
+ */
+async function dispatchMilestoneNotification(title, body, tagSuffix = 'generic') {
+    const options = {
+        body,
+        icon: 'icons/icon-192.png',
+        badge: 'icons/favicon.svg',
+        vibrate: [200, 100, 200, 100, 200],
+        tag: `gastei-agora-milestone-${tagSuffix}`,
+        renotify: true,
+        requireInteraction: true,
+        data: { url: './' },
+        actions: [
+            { action: 'open', title: 'Ver Metas' },
+            { action: 'dismiss', title: 'Entendido' }
+        ]
+    };
+
+    if ('serviceWorker' in navigator) {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            if (reg && typeof reg.showNotification === 'function') {
+                await reg.showNotification(title, options);
+                return;
+            }
+        } catch (e) {
+            console.warn('Erro ao disparar via SW:', e);
+        }
+    }
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            new Notification(title, options);
+            return;
+        } catch (e) {
+            console.warn('Erro ao disparar Notification nativa:', e);
+        }
+    }
+
+    showInAppNotificationFallback(title, body);
+}
+
+/**
+ * Função de teste interativo para simular os 5 lembretes (1 mês, 15 dias, 1 semana, 3 dias e Último dia)
+ */
+async function simulateMilestoneNotifications() {
+    const { deadline, debt } = currentFinanceData;
+    const debtVal = debt > 0 ? debt : 3500;
+    const dateFormatted = deadline ? formatDateBR(deadline) : '31/12/2026';
+
+    // Se permissões ainda não foram dadas, abre o modal de permissão primeiro
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        openNotificationExplanationModal(Notification.permission);
+        return;
+    }
+
+    showFeedback('🔔 Demonstrando os 5 lembretes programados...', 'info');
+
+    let idx = 0;
+    function playNext() {
+        if (idx >= REMINDER_MILESTONES.length) {
+            showFeedback('🎉 Demonstração dos 5 lembretes concluída com sucesso!', 'success');
+            return;
+        }
+        const m = REMINDER_MILESTONES[idx];
+        const title = `[${m.label}] ${m.title}`;
+        const msg = m.getMessage(debtVal, dateFormatted);
+
+        dispatchMilestoneNotification(title, msg, m.id);
+        showInAppNotificationFallback(title, msg);
+
+        idx++;
+        if (idx < REMINDER_MILESTONES.length) {
+            setTimeout(playNext, 2000);
+        }
+    }
+
+    playNext();
 }

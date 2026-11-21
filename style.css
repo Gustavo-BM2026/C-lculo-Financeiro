@@ -2698,3 +2698,132 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         justify-content: space-between;
     }
 }
+
+/* ============================================================================
+   11. CRONOGRAMA DE LEMBRETES DA DÍVIDA (1 MÊS, 15 DIAS, 1 SEMANA, 3 DIAS, ÚLTIMO DIA)
+   ============================================================================ */
+
+.debt-reminders-schedule-card {
+    background: var(--bg-card-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 1.1rem;
+    margin-bottom: 1.5rem;
+    transition: var(--transition);
+}
+
+.debt-reminders-schedule-card:hover {
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+.reminders-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.reminders-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.reminders-icon {
+    font-size: 1.35rem;
+    background: var(--accent-glow);
+    padding: 0.45rem;
+    border-radius: var(--border-radius-sm);
+    line-height: 1;
+}
+
+.reminders-title-group h4 {
+    margin: 0;
+    font-size: 0.96rem;
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.reminders-subtitle {
+    margin: 0.2rem 0 0 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.reminders-timeline {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
+}
+
+.reminder-milestone-item {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.reminder-milestone-item:hover {
+    border-color: var(--border-focus);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.reminder-milestone-item.active-today {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 14px var(--accent-glow);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.reminder-milestone-item.past {
+    opacity: 0.6;
+}
+
+.milestone-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    align-self: flex-start;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.milestone-badge.badge-month { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
+.milestone-badge.badge-15d { background: rgba(14, 165, 233, 0.18); color: #38bdf8; }
+.milestone-badge.badge-7d { background: rgba(234, 179, 8, 0.18); color: #facc15; }
+.milestone-badge.badge-3d { background: rgba(249, 115, 22, 0.18); color: #fb923c; }
+.milestone-badge.badge-0d { background: rgba(239, 68, 68, 0.22); color: #f87171; }
+
+.milestone-date {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 0.2rem;
+}
+
+.milestone-status {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+.milestone-status.status-today {
+    color: var(--accent-color);
+    font-weight: 700;
+}
+
+.milestone-status.status-future {
+    color: var(--color-success);
+}
+
+.milestone-status.status-past {
+    color: var(--text-muted);
+}

@@ -645,6 +645,25 @@
                         </div>
                     </div>
 
+                    <!-- Cronograma de Notificações / Lembretes de Vencimento -->
+                    <div class="debt-reminders-schedule-card" id="debtRemindersScheduleCard">
+                        <div class="reminders-header">
+                            <div class="reminders-title-group">
+                                <span class="reminders-icon">🔔</span>
+                                <div>
+                                    <h4>Lembretes de Pagamento Agendados</h4>
+                                    <p class="reminders-subtitle">Notificações automáticas programadas (1 mês, 15 dias, 1 semana, 3 dias e Último dia):</p>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="simulateMilestoneNotifications()" title="Testar a exibição dos 5 alertas de lembrete">
+                                🧪 Testar os 5 Lembretes
+                            </button>
+                        </div>
+                        <div class="reminders-timeline" id="remindersTimelineList">
+                            <!-- Preenchido dinamicamente via JS -->
+                        </div>
+                    </div>
+
                     <!-- Calendário Financeiro com Lembretes de Pagamento -->
                     <div class="calendar-card-section" id="calendarSection">
                         <div class="calendar-header-bar">
