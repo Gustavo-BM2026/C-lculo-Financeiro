@@ -63,6 +63,12 @@
                     <span class="theme-text">Modo Claro</span>
                 </button>
 
+                <!-- Botão de Notificações PWA -->
+                <button id="notifNavBtn" class="btn-icon" aria-label="Testar notificações do aplicativo" title="Testar notificações do PWA" onclick="handleNotificationButtonClick()">
+                    <span class="nav-icon">🔔</span>
+                    <span class="nav-text">Notificações</span>
+                </button>
+
                 <!-- Botão de Auditoria / Logs (Restrito ao Administrador - Oculto por padrão para visitantes e outros usuários) -->
                 <button id="auditNavBtn" class="btn-icon hidden" aria-label="Histórico de alterações e auditoria do administrador" title="Logs de Auditoria (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
                     <span class="nav-icon">🔒</span>
@@ -397,6 +403,61 @@
             </div>
         </div>
 
+        <!-- MODAL: Explicação e Solicitação de Permissão de Notificações -->
+        <div id="notifExplanationModal" class="modal-backdrop hidden" onclick="handleNotificationBackdropClick(event)">
+            <div class="modal-container">
+                <button class="btn-close-modal" onclick="closeNotificationExplanationModal()" aria-label="Fechar janela" title="Fechar">✕</button>
+                
+                <div class="card auth-card modal-auth-card">
+                    <div class="form-header" style="text-align: center;">
+                        <div class="notif-bell-icon" style="font-size: 2.4rem; margin-bottom: 0.5rem;">🔔</div>
+                        <h3 id="notifModalTitle">Lembretes & Notificações Inteligentes</h3>
+                        <p id="notifModalSubtitle" style="color: var(--text-secondary); margin-top: 0.35rem; font-size: 0.9rem; line-height: 1.5;">
+                            Mantenha o foco na sua liberdade financeira! O <strong>Gastei & Agora?</strong> pode avisar você sobre:
+                        </p>
+                    </div>
+
+                    <div class="notif-benefits-list" style="margin: 1.25rem 0; text-align: left; background: var(--bg-card-secondary); padding: 1rem 1.25rem; border-radius: var(--border-radius-md); border: 1px solid var(--border-color); font-size: 0.88rem; line-height: 1.6;">
+                        <div style="display: flex; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.6rem;">
+                            <span>🏁</span>
+                            <span><strong>Prazos de Pagamento (Deadlines):</strong> Lembretes na véspera e no dia da quitação para você nunca atrasar parcelas.</span>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.6rem;">
+                            <span>📊</span>
+                            <span><strong>Metas Diárias de Economia:</strong> Alertas gentis para não exceder seu teto diário de gastos.</span>
+                        </div>
+                        <div style="display: flex; align-items: flex-start; gap: 0.6rem;">
+                            <span>🤖</span>
+                            <span><strong>Dicas da FinAI:</strong> Estratégias semanais para conter compras por impulso.</span>
+                        </div>
+                    </div>
+
+                    <div id="notifStatusMessage" class="alert-msg info hidden" style="margin-bottom: 1rem;"></div>
+
+                    <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                        <button type="button" class="btn btn-outline" onclick="closeNotificationExplanationModal()">Agora Não</button>
+                        <button type="button" id="notifConfirmBtn" class="btn btn-primary" onclick="confirmAndRequestNotificationPermission()">
+                            <span>🔔 Ativar e Testar Agora</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOAST / BANNER: Fallback Visual In-App de Notificação (Quando não houver suporte nativo ou para demonstração) -->
+        <div id="notifInAppFallback" class="in-app-notif-toast hidden" role="alert" aria-live="polite">
+            <div class="in-app-notif-icon">🔔</div>
+            <div class="in-app-notif-body">
+                <div class="in-app-notif-header">
+                    <span class="in-app-notif-appname">Gastei &amp; Agora? • Demonstração</span>
+                    <button class="in-app-notif-close" onclick="closeInAppNotificationFallback()" aria-label="Fechar notificação">✕</button>
+                </div>
+                <strong id="inAppNotifTitle" class="in-app-notif-title">Lembrete de Pagamento</strong>
+                <p id="inAppNotifMessage" class="in-app-notif-text">Você tem uma meta financeira agendada para hoje. Mantenha o foco na sua liberdade financeira! 💰</p>
+                <small id="inAppNotifHint" class="in-app-notif-hint hidden">💡 Dica: No iOS Safari, instale o app via "Adicionar à Tela de Início" para receber alertas nativos.</small>
+            </div>
+        </div>
+
         <!-- SECTION: Painel Principal da Planilha e Gestão (Visível após login) -->
         <section id="dashboardSection" class="dashboard-section hidden">
             
@@ -412,6 +473,12 @@
                         <span class="privacy-icon eye-open">👁️</span>
                         <span class="privacy-icon eye-closed hidden">🙈</span>
                         <span class="privacy-text">Ocultar Valores</span>
+                    </button>
+
+                    <!-- Botão de Teste de Notificações PWA -->
+                    <button id="notifGreetingBtn" class="btn-icon" aria-label="Testar notificações do aplicativo" title="Testar notificações do PWA" onclick="handleNotificationButtonClick()">
+                        <span class="notif-icon">🔔</span>
+                        <span class="notif-text">Notificações</span>
                     </button>
 
                     <!-- Botão de Auditoria / Logs (Restrito ao Administrador - Oculto por padrão) -->

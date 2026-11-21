@@ -876,6 +876,8 @@ document.addEventListener('keydown', (e) => {
         closeAuthModal();
         closeAuditModal();
         closeAdminPinModal();
+        closeNotificationExplanationModal();
+        closeInAppNotificationFallback();
     }
     // Atalho secreto do Administrador (Ctrl + Shift + L)
     if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
@@ -2520,4 +2522,223 @@ async function handleVerifyAdminPin(event) {
             await logActivity('SECURITY_ALERT', 'Tentativa de acesso não autorizado aos logs com chave incorreta.', {});
         }
     }
+}
+
+/* ============================================================================
+   9. GERENCIAMENTO DE NOTIFICAÇÕES PWA (WEB NOTIFICATIONS API & SERVICE WORKER)
+   ============================================================================ */
+
+let inAppNotifTimer = null;
+
+/**
+ * Ponto de entrada ao clicar no botão "Testar Notificação"
+ * Avalia suporte do navegador e estado atual de permissão
+ */
+function handleNotificationButtonClick() {
+    // 1. Verifica se a API de Notificações é suportada no navegador atual
+    if (!('Notification' in window)) {
+        showInAppNotificationFallback(
+            'Lembrete de Pagamento (Demonstração)',
+            'Seu navegador ou dispositivo atual não possui suporte nativo à Web Notifications API. Esta é uma simulação visual dentro do app!',
+            true
+        );
+        return;
+    }
+
+    const currentPermission = Notification.permission;
+
+    // 2. Se já tiver permissão concedida, dispara a demonstração diretamente
+    if (currentPermission === 'granted') {
+        triggerDemoNotification();
+        showFeedback('🔔 Notificação de teste enviada com sucesso!', 'success');
+        return;
+    }
+
+    // 3. Se estiver bloqueado ('denied') ou ainda não solicitado ('default'), abre o modal explicativo
+    openNotificationExplanationModal(currentPermission);
+}
+
+/**
+ * Abre o modal explicativo contextualizando o propósito dos lembretes
+ */
+function openNotificationExplanationModal(permissionState = 'default') {
+    const modal = document.getElementById('notifExplanationModal');
+    const statusMsg = document.getElementById('notifStatusMessage');
+    const confirmBtn = document.getElementById('notifConfirmBtn');
+
+    if (!modal) return;
+
+    if (permissionState === 'denied') {
+        if (statusMsg) {
+            statusMsg.className = 'alert-msg warning';
+            statusMsg.innerHTML = '⚠️ As notificações estão bloqueadas nas configurações do seu navegador.<br>Para ativá-las, clique no ícone de <strong>cadeado 🔒</strong> ao lado da barra de endereço e mude "Notificações" para "Permitir".';
+            statusMsg.classList.remove('hidden');
+        }
+        if (confirmBtn) {
+            confirmBtn.innerHTML = '<span>Simular Demonstração Visual</span>';
+        }
+    } else {
+        if (statusMsg) {
+            statusMsg.classList.add('hidden');
+            statusMsg.textContent = '';
+        }
+        if (confirmBtn) {
+            confirmBtn.innerHTML = '<span>🔔 Ativar e Testar Agora</span>';
+        }
+    }
+
+    modal.classList.remove('hidden');
+}
+
+/**
+ * Fecha o modal explicativo
+ */
+function closeNotificationExplanationModal() {
+    const modal = document.getElementById('notifExplanationModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+/**
+ * Fecha o modal ao clicar fora da caixa
+ */
+function handleNotificationBackdropClick(event) {
+    if (event.target.id === 'notifExplanationModal') {
+        closeNotificationExplanationModal();
+    }
+}
+
+/**
+ * Solicita a permissão nativa do navegador após confirmação do usuário
+ */
+async function confirmAndRequestNotificationPermission() {
+    closeNotificationExplanationModal();
+
+    if (!('Notification' in window)) {
+        showInAppNotificationFallback(
+            'Lembrete de Pagamento',
+            'Demonstração visual ativada com sucesso!',
+            true
+        );
+        return;
+    }
+
+    if (Notification.permission === 'denied') {
+        // Se já estava negado, oferece demonstração visual in-app
+        showInAppNotificationFallback(
+            'Lembrete de Pagamento',
+            'Como as permissões nativas estão bloqueadas no navegador, exibimos este alerta simulado dentro do aplicativo!',
+            true
+        );
+        return;
+    }
+
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            await triggerDemoNotification();
+            await logActivity('SETTINGS_CHANGE', 'Permissão para notificações do PWA concedida pelo usuário.', {});
+            showFeedback('🎉 Notificações ativadas com sucesso! Você receberá lembretes das suas metas.', 'success');
+        } else {
+            showInAppNotificationFallback(
+                'Permissão Não Concedida',
+                'Você optou por não receber notificações nativas. Caso mude de ideia, poderá ativá-las a qualquer momento pelo botão 🔔 Notificações.',
+                false
+            );
+        }
+    } catch (err) {
+        console.warn('Erro ao solicitar permissão de notificações:', err);
+        showInAppNotificationFallback('Lembrete de Pagamento', 'Demonstração de lembrete financeiro ativo!', true);
+    }
+}
+
+/**
+ * Dispara uma notificação nativa de demonstração utilizando Service Worker ou Notification API
+ */
+async function triggerDemoNotification() {
+    const title = '🔔 Gastei & Agora? — Lembrete de Pagamento';
+    const options = {
+        body: 'Você tem uma meta financeira agendada para hoje. Mantenha o foco na sua liberdade financeira! 💰',
+        icon: 'icons/icon-192.png',
+        badge: 'icons/favicon.svg',
+        vibrate: [100, 50, 100],
+        tag: 'gastei-agora-demo-notif',
+        renotify: true,
+        data: { url: './' }
+    };
+
+    // 1. Tenta disparar através do Service Worker (Padrão ouro para PWA no Android, Desktop e iOS PWA)
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration && typeof registration.showNotification === 'function') {
+                await registration.showNotification(title, options);
+                return;
+            }
+        } catch (e) {
+            console.warn('SW showNotification falhou, tentando fallback direto:', e);
+        }
+    }
+
+    // 2. Fallback nativo simples
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            new Notification(title, options);
+            return;
+        } catch (e) {
+            console.warn('new Notification falhou:', e);
+        }
+    }
+
+    // 3. Fallback visual in-app se tudo falhar
+    showInAppNotificationFallback(title, options.body);
+}
+
+/**
+ * Exibe notificação simulada in-app caso o navegador não suporte push nativo ou permissão seja negada
+ */
+function showInAppNotificationFallback(title, message, isUnsupportedWarning = false) {
+    const toast = document.getElementById('notifInAppFallback');
+    const titleEl = document.getElementById('inAppNotifTitle');
+    const msgEl = document.getElementById('inAppNotifMessage');
+    const hintEl = document.getElementById('inAppNotifHint');
+
+    if (!toast) return;
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+
+    if (hintEl) {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        if (isIOS) {
+            hintEl.textContent = '💡 Dica para iPhone: Para receber alertas nativos no iOS, instale este app tocando em Compartilhar ➜ "Adicionar à Tela de Início".';
+            hintEl.classList.remove('hidden');
+        } else if (isUnsupportedWarning) {
+            hintEl.textContent = '💡 Este navegador exibe lembretes visuais dentro da própria página.';
+            hintEl.classList.remove('hidden');
+        } else {
+            hintEl.classList.add('hidden');
+        }
+    }
+
+    toast.classList.remove('hiding');
+    toast.classList.remove('hidden');
+
+    if (inAppNotifTimer) clearTimeout(inAppNotifTimer);
+    inAppNotifTimer = setTimeout(() => {
+        closeInAppNotificationFallback();
+    }, 7000);
+}
+
+/**
+ * Fecha a notificação in-app com animação suave
+ */
+function closeInAppNotificationFallback() {
+    const toast = document.getElementById('notifInAppFallback');
+    if (!toast || toast.classList.contains('hidden')) return;
+
+    toast.classList.add('hiding');
+    setTimeout(() => {
+        toast.classList.add('hidden');
+        toast.classList.remove('hiding');
+    }, 300);
 }

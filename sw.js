@@ -1,6 +1,6 @@
 /**
  * Service Worker Oficial do PWA: Gastei & Agora?
- * Versão do Cache: gastei-agora-v2
+ * Versão do Cache: gastei-agora-v3
  * 
  * Regras de Segurança:
  * - Network-Only para Supabase (*.supabase.co) para preservar integridade de Auth e RLS
@@ -9,7 +9,7 @@
  * - Fallback inteligente para offline.html quando sem conexão
  */
 
-const CACHE_NAME = 'gastei-agora-v2';
+const CACHE_NAME = 'gastei-agora-v3';
 
 // Recursos essenciais para pré-cache imediato
 const PRECACHE_ASSETS = [
@@ -130,3 +130,23 @@ self.addEventListener('fetch', (event) => {
             })
     );
 });
+
+// Interceptação de clique na notificação nativa
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            // Se houver uma aba/janela já aberta, foca nela
+            for (const client of clientList) {
+                if (client.url && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // Se não houver, abre uma nova janela do app
+            if (clients.openWindow) {
+                return clients.openWindow('./');
+            }
+        })
+    );
+});
+
