@@ -41,10 +41,10 @@
                     <span class="theme-text">Modo Claro</span>
                 </button>
 
-                <!-- Botão de Auditoria / Logs (Visível no topo) -->
-                <button id="auditNavBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria" title="Ver logs de alterações do site" onclick="openAuditModal()">
-                    <span class="nav-icon">📜</span>
-                    <span class="nav-text">Logs</span>
+                <!-- Botão de Auditoria / Logs (Restrito ao Administrador) -->
+                <button id="auditNavBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria do administrador" title="Logs de Auditoria (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
+                    <span class="nav-icon">🔒</span>
+                    <span class="nav-text">Logs (Admin)</span>
                 </button>
 
                 <!-- Botão de Login / Cadastro (Ao lado do tema, visível quando deslogado) -->
@@ -311,6 +311,12 @@
                             <button type="button" class="btn btn-outline btn-xs" onclick="exportAuditLogs()" title="Baixar histórico em arquivo JSON">
                                 📥 Baixar Relatório
                             </button>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="promptChangeAdminPin()" title="Alterar PIN de segurança do administrador">
+                                🔑 Trocar PIN
+                            </button>
+                            <button type="button" class="btn btn-outline btn-xs" onclick="lockAdminAccess()" title="Bloquear acesso aos logs">
+                                🔒 Bloquear
+                            </button>
                             <button type="button" class="btn btn-outline btn-xs btn-danger-ghost" onclick="clearAuditLogs()" title="Limpar histórico local">
                                 🗑️ Limpar Logs
                             </button>
@@ -325,6 +331,46 @@
                     <div class="audit-modal-footer">
                         <small>🛡️ Encadeamento criptográfico SHA-256 ativo: qualquer manipulação externa é sinalizada em vermelho.</small>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: Desbloqueio e Autenticação do Administrador -->
+        <div id="adminPinModal" class="modal-backdrop hidden" onclick="handleAdminPinBackdropClick(event)">
+            <div class="modal-container">
+                <button class="btn-close-modal" onclick="closeAdminPinModal()" aria-label="Fechar janela" title="Fechar">✕</button>
+                
+                <div class="card auth-card modal-auth-card">
+                    <div class="form-header" style="text-align: center;">
+                        <div class="admin-lock-icon" style="font-size: 2.2rem; margin-bottom: 0.5rem;">🔒</div>
+                        <h3 id="adminPinModalTitle">Acesso Restrito ao Administrador</h3>
+                        <p id="adminPinModalSubtitle">Insira seu PIN secreto para visualizar o histórico de atividades e auditoria do site.</p>
+                    </div>
+
+                    <form id="adminPinForm" class="auth-form" onsubmit="handleVerifyAdminPin(event)">
+                        <div class="form-group hidden" id="adminPinOldGroup">
+                            <label for="adminPinOldInput">PIN Atual</label>
+                            <input type="password" id="adminPinOldInput" placeholder="Digite seu PIN atual" maxlength="32">
+                        </div>
+
+                        <div class="form-group" id="adminPinInputGroup">
+                            <label for="adminPinInput" id="adminPinInputLabel">PIN Secreto</label>
+                            <input type="password" id="adminPinInput" placeholder="Digite seu PIN (ex: 4 a 8 dígitos)" required maxlength="32" autocomplete="current-password">
+                            <small class="field-hint" id="adminPinHint">Apenas quem tiver esse PIN poderá abrir o log de auditoria.</small>
+                        </div>
+
+                        <div class="form-group hidden" id="adminPinConfirmGroup">
+                            <label for="adminPinConfirmInput">Confirme o PIN</label>
+                            <input type="password" id="adminPinConfirmInput" placeholder="Repita o mesmo PIN para confirmar" maxlength="32" autocomplete="new-password">
+                        </div>
+
+                        <div id="adminPinError" class="alert-msg error hidden"></div>
+                        <div id="adminPinSuccess" class="alert-msg success hidden"></div>
+
+                        <button type="submit" id="adminPinSubmitBtn" class="btn btn-primary btn-block">
+                            <span>Desbloquear Auditoria</span>
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -346,10 +392,10 @@
                         <span class="privacy-text">Ocultar Valores</span>
                     </button>
 
-                    <!-- Botão de Auditoria / Logs -->
-                    <button id="auditGreetingBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria" title="Ver logs e histórico de alterações no site" onclick="openAuditModal()">
-                        <span class="audit-icon">📜</span>
-                        <span class="audit-text">Registro de Atividades</span>
+                    <!-- Botão de Auditoria / Logs (Restrito ao Administrador) -->
+                    <button id="auditGreetingBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria do administrador" title="Registro de Atividades (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
+                        <span class="audit-icon">🔒</span>
+                        <span class="audit-text">Logs (Admin)</span>
                     </button>
 
                     <div class="status-chip" id="debtHealthBadge">
