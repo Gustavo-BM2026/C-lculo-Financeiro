@@ -126,6 +126,7 @@ body.theme-transitioning *::after {
     background-color: var(--bg-navbar);
     border-bottom: 1px solid var(--border-color);
     transition: var(--transition);
+    padding-top: env(safe-area-inset-top, 0px);
 }
 
 .nav-container {
@@ -1664,7 +1665,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    ========================================================================== */
 .footer {
     border-top: 1px solid var(--border-color);
-    padding: 1.75rem 1.5rem;
+    padding: 1.75rem 1.5rem max(1.75rem, env(safe-area-inset-bottom, 1.75rem)) 1.5rem;
     text-align: center;
     font-size: 0.85rem;
     color: var(--text-muted);

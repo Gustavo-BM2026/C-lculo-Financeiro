@@ -124,6 +124,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupPrivacyTouchSupport();
     startMachineClock();
     updateAdminVisibility();
+    initServiceWorker();
+    setupNetworkStatusListeners();
 
     // Configura o ouvinte oficial reativo do Supabase Auth
     await setupAuthListener();
@@ -245,6 +247,12 @@ function applyTheme(theme, syncWithDb = true) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(STORAGE_KEYS.THEME, theme);
 
+    // Sincroniza o meta theme-color para navegadores móveis e status bar no PWA
+    const metaTheme = document.getElementById('metaThemeColor');
+    if (metaTheme) {
+        metaTheme.setAttribute('content', theme === 'light' ? '#f1f5f9' : '#0f172a');
+    }
+
     const themeText = document.querySelector('.theme-text');
     if (themeText) {
         themeText.textContent = theme === 'dark' ? 'Modo Claro' : 'Modo Escuro';
@@ -254,6 +262,51 @@ function applyTheme(theme, syncWithDb = true) {
         supabaseClient.from('profiles').update({ theme_preference: theme }).eq('id', currentUser.id)
             .then(({ error }) => { if (error) console.warn('Erro ao sincronizar tema no Supabase:', error); });
     }
+}
+
+/**
+ * Registra o Service Worker do PWA com tratamento de ciclo de vida
+ */
+function initServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+                .then((registration) => {
+                    console.log('✅ [PWA] Service Worker registrado com sucesso:', registration.scope);
+
+                    registration.onupdatefound = () => {
+                        const installingWorker = registration.installing;
+                        if (installingWorker) {
+                            installingWorker.onstatechange = () => {
+                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('🔄 [PWA] Nova versão disponível em segundo plano.');
+                                }
+                            };
+                        }
+                    };
+                })
+                .catch((error) => {
+                    console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', error);
+                });
+        });
+    }
+}
+
+/**
+ * Monitora o status de conectividade online/offline com feedback visual suave
+ */
+function setupNetworkStatusListeners() {
+    window.addEventListener('online', () => {
+        showFeedback('📶 Conexão reestabelecida! Seus dados estão sincronizados.', 'success');
+        if (currentUser && typeof isSupabaseConfigured === 'function' && isSupabaseConfigured()) {
+            loadUserFinanceData();
+            loadCalendarNotesFromStorage();
+        }
+    });
+
+    window.addEventListener('offline', () => {
+        showFeedback('📡 Você está desconectado da internet. O modo offline do app está ativo.', 'info');
+    });
 }
 
 function toggleTheme() {
