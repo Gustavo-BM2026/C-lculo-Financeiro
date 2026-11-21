@@ -21,6 +21,7 @@ const STORAGE_KEYS = {
 // E-mail padrão do proprietário/administrador oficial do sistema
 const DEFAULT_ADMIN_EMAIL = 'gustavo.brilhamais@gmail.com';
 const MASTER_ADMIN_KEYS = ['admin2026', 'gustavo2026', 'gustavo.brilhamais@gmail.com'];
+const MAX_SAFE_FINANCE_VALUE = 999999999999999; // 999 Trilhões (limite seguro contra estouro de float IEEE-754)
 
 // Estado da Aplicação
 let currentUser = null;
@@ -1029,10 +1030,22 @@ async function handleSaveFinanceData(e) {
     e.preventDefault();
     if (!currentUser) return;
 
-    const salary = parseFloat(document.getElementById('monthlySalary').value) || 0;
-    const debt = parseFloat(document.getElementById('totalDebt').value) || 0;
+    let salary = parseFloat(document.getElementById('monthlySalary').value) || 0;
+    let debt = parseFloat(document.getElementById('totalDebt').value) || 0;
     const deadline = document.getElementById('debtDeadline').value;
-    const essentials = parseFloat(document.getElementById('essentialExpenses').value) || 0;
+    let essentials = parseFloat(document.getElementById('essentialExpenses').value) || 0;
+
+    let wasCapped = false;
+    if (salary > MAX_SAFE_FINANCE_VALUE) { salary = MAX_SAFE_FINANCE_VALUE; wasCapped = true; }
+    if (debt > MAX_SAFE_FINANCE_VALUE) { debt = MAX_SAFE_FINANCE_VALUE; wasCapped = true; }
+    if (essentials > MAX_SAFE_FINANCE_VALUE) { essentials = MAX_SAFE_FINANCE_VALUE; wasCapped = true; }
+
+    if (wasCapped) {
+        showFeedback('Valores acima de R$ 999 Trilhões foram limitados para preservar a precisão dos cálculos e a integridade visual.', 'info');
+        document.getElementById('monthlySalary').value = salary;
+        document.getElementById('totalDebt').value = debt;
+        if (document.getElementById('essentialExpenses')) document.getElementById('essentialExpenses').value = essentials;
+    }
 
     if (!deadline) {
         alert('Por favor, escolha uma data limite (deadline) no calendário.');
@@ -1504,7 +1517,13 @@ function scrollChatToBottom() {
    ============================================================================ */
 function formatCurrency(val, wrapPrivacy = false) {
     if (isNaN(val) || val === null) val = 0;
-    const formatted = Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    let num = Number(val);
+    if (!isFinite(num) || num > MAX_SAFE_FINANCE_VALUE) {
+        num = MAX_SAFE_FINANCE_VALUE;
+    } else if (num < -MAX_SAFE_FINANCE_VALUE) {
+        num = -MAX_SAFE_FINANCE_VALUE;
+    }
+    const formatted = num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 });
     if (wrapPrivacy) {
         return `<span class="privacy-value" title="Passe o mouse para revelar">${formatted}</span>`;
     }
@@ -1586,7 +1605,18 @@ function updateMachineClock() {
         minute: '2-digit',
         second: '2-digit'
     });
-    clockEl.innerHTML = `📅 <strong>${dateFormatted}</strong> &bull; ⏰ <strong>${timeFormatted}</strong>`;
+    clockEl.innerHTML = `📅 <strong>${dateFormatted}</strong> &bull; ⏰ <strong class="clock-time-digits">${timeFormatted}</strong>`;
+
+    // Sincroniza o calendário se o dia da máquina virar (à meia-noite)
+    const currentToday = toISODateString(now);
+    if (clockEl.dataset.todayStr && clockEl.dataset.todayStr !== currentToday) {
+        calendarState.viewYear = now.getFullYear();
+        calendarState.viewMonth = now.getMonth();
+        calendarState.selectedDateStr = currentToday;
+        renderCalendarGrid();
+        renderSelectedDateNotes();
+    }
+    clockEl.dataset.todayStr = currentToday;
 }
 
 /**
@@ -1886,7 +1916,11 @@ function handleSaveCalendarNote(event) {
     const text = textInput.value.trim();
     if (!text) return;
 
-    const val = parseFloat(valInput.value) || null;
+    let val = parseFloat(valInput.value) || null;
+    if (val !== null && val > MAX_SAFE_FINANCE_VALUE) {
+        val = MAX_SAFE_FINANCE_VALUE;
+        valInput.value = val;
+    }
 
     if (!calendarState.notes[dateStr]) {
         calendarState.notes[dateStr] = [];

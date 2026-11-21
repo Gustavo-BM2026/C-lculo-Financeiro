@@ -1,7 +1,7 @@
 {
   "id": "gastei-agora-pwa-v1",
-  "name": "Gastei & Agora? - Gestor Financeiro",
-  "short_name": "Gastei&Agora?",
+  "name": "Gastei & Agora?",
+  "short_name": "Gastei & Agora?",
   "description": "Recuperação financeira inteligente, gestão de dívidas e consultoria com IA.",
   "start_url": "./index.html",
   "scope": "./",

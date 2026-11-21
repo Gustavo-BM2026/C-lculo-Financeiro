@@ -14,7 +14,7 @@
     <!-- Apple iOS Safari Specific -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Gastei&Agora?">
+    <meta name="apple-mobile-web-app-title" content="Gastei & Agora?">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     
     <!-- Favicon -->
@@ -448,7 +448,7 @@
                             </label>
                             <div class="input-prefix-wrapper">
                                 <span class="prefix">R$</span>
-                                <input type="number" id="monthlySalary" step="0.01" min="0" placeholder="Ex: 3500.00" required>
+                                <input type="number" id="monthlySalary" step="0.01" min="0" max="999999999999999" placeholder="Ex: 3500.00" required>
                             </div>
                         </div>
 
@@ -459,7 +459,7 @@
                             </label>
                             <div class="input-prefix-wrapper">
                                 <span class="prefix">R$</span>
-                                <input type="number" id="totalDebt" step="0.01" min="0" placeholder="Ex: 8500.00" required>
+                                <input type="number" id="totalDebt" step="0.01" min="0" max="999999999999999" placeholder="Ex: 8500.00" required>
                             </div>
                         </div>
 
@@ -479,7 +479,7 @@
                             </label>
                             <div class="input-prefix-wrapper">
                                 <span class="prefix">R$</span>
-                                <input type="number" id="essentialExpenses" step="0.01" min="0" placeholder="Ex: 1800.00">
+                                <input type="number" id="essentialExpenses" step="0.01" min="0" max="999999999999999" placeholder="Ex: 1800.00">
                             </div>
                             <small class="field-hint">Ajuda a IA a calcular quanto realmente sobra do seu salário.</small>
                         </div>
@@ -593,7 +593,7 @@
                                 <div class="note-form-row">
                                     <div class="input-prefix-wrapper compact">
                                         <span class="prefix">R$</span>
-                                        <input type="number" id="noteValueInput" step="0.01" min="0" placeholder="Valor opcional">
+                                        <input type="number" id="noteValueInput" step="0.01" min="0" max="999999999999999" placeholder="Valor opcional">
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm">
                                         <span>Adicionar Nota</span>

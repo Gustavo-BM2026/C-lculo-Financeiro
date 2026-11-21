@@ -1315,22 +1315,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 1.75rem;
+    max-width: 100%;
 }
 
 @media (max-width: 900px) {
     .dashboard-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
 /* Metrics Box Grid */
 .metrics-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 1rem;
     margin-bottom: 1.5rem;
+    max-width: 100%;
 }
 
 .metric-box {
@@ -1341,6 +1343,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .metric-box.highlight {
@@ -1354,18 +1359,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .metric-value {
-    font-size: 1.45rem;
+    font-size: clamp(1rem, 2vw, 1.45rem);
     font-weight: 800;
     color: var(--text-primary);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.25;
+    max-width: 100%;
 }
 
 .metric-sub {
     font-size: 0.8rem;
     color: var(--accent-color);
     font-weight: 600;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .text-danger { color: var(--color-danger) !important; }
@@ -1380,6 +1394,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     border-radius: var(--border-radius-md);
     margin-bottom: 1.5rem;
     border: 1px solid transparent;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .feasibility-box.info {
@@ -1409,18 +1426,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .alert-icon {
     font-size: 1.6rem;
     line-height: 1;
+    flex-shrink: 0;
+}
+
+.alert-content {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .alert-content strong {
     display: block;
     font-size: 0.95rem;
     margin-bottom: 0.2rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .alert-content p {
     font-size: 0.85rem;
     color: var(--text-secondary);
     line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 /* Progress Bar */
@@ -1762,25 +1791,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .calendar-machine-info {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .calendar-machine-clock {
     font-size: 0.76rem;
-    padding: 0.3rem 0.75rem;
+    padding: 0.35rem 0.85rem;
     border-radius: 9999px;
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    justify-content: center;
+    gap: 0.4rem;
     white-space: nowrap;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    min-width: 255px;
+    box-sizing: border-box;
 }
 
 .calendar-machine-clock strong {
     color: var(--text-primary);
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+.calendar-machine-clock .clock-time-digits {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    display: inline-block;
+    min-width: 65px;
+    text-align: center;
 }
 
 .calendar-quick-actions {
@@ -2314,6 +2359,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .calendar-machine-clock {
         font-size: 0.72rem;
         padding: 0.25rem 0.55rem;
+        min-width: 235px;
     }
 
     .calendar-days-grid {
