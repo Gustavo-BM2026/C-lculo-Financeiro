@@ -25,7 +25,7 @@
     <!-- Top Navigation -->
     <header class="navbar">
         <div class="nav-container">
-            <div class="brand">
+            <div class="brand" id="brandLogo" onclick="handleBrandSecretClick()" style="cursor: pointer;" title="Gastei & Agora?">
                 <span class="brand-icon">💳</span>
                 <div class="brand-text">
                     <h1>Gastei & Agora?</h1>
@@ -41,8 +41,8 @@
                     <span class="theme-text">Modo Claro</span>
                 </button>
 
-                <!-- Botão de Auditoria / Logs (Restrito ao Administrador) -->
-                <button id="auditNavBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria do administrador" title="Logs de Auditoria (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
+                <!-- Botão de Auditoria / Logs (Restrito ao Administrador - Oculto por padrão para visitantes e outros usuários) -->
+                <button id="auditNavBtn" class="btn-icon hidden" aria-label="Histórico de alterações e auditoria do administrador" title="Logs de Auditoria (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
                     <span class="nav-icon">🔒</span>
                     <span class="nav-text">Logs (Admin)</span>
                 </button>
@@ -392,8 +392,8 @@
                         <span class="privacy-text">Ocultar Valores</span>
                     </button>
 
-                    <!-- Botão de Auditoria / Logs (Restrito ao Administrador) -->
-                    <button id="auditGreetingBtn" class="btn-icon" aria-label="Histórico de alterações e auditoria do administrador" title="Registro de Atividades (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
+                    <!-- Botão de Auditoria / Logs (Restrito ao Administrador - Oculto por padrão) -->
+                    <button id="auditGreetingBtn" class="btn-icon hidden" aria-label="Histórico de alterações e auditoria do administrador" title="Registro de Atividades (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
                         <span class="audit-icon">🔒</span>
                         <span class="audit-text">Logs (Admin)</span>
                     </button>

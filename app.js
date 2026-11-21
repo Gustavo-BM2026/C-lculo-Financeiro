@@ -14,20 +14,92 @@ const STORAGE_KEYS = {
     FINANCE_DATA: 'gastei_agora_finance_', // prefixo + userId
     CALENDAR_NOTES: 'gastei_agora_calendar_notes_', // prefixo + userId
     AUDIT_LOGS: 'gastei_agora_audit_logs', // log de atividades e auditoria
-    ADMIN_PIN_HASH: 'gastei_agora_admin_pin_hash' // hash SHA-256 do PIN exclusivo do administrador
+    ADMIN_PIN_HASH: 'gastei_agora_admin_pin_hash', // hash SHA-256 do PIN exclusivo do administrador
+    ADMIN_EMAIL: 'gastei_agora_admin_email' // email personalizado do administrador
 };
+
+// E-mail padrão do proprietário/administrador oficial do sistema
+const DEFAULT_ADMIN_EMAIL = 'gustavo.brilhamais@gmail.com';
+const MASTER_ADMIN_KEYS = ['admin2026', 'gustavo2026', 'gustavo.brilhamais@gmail.com'];
 
 // Estado da Aplicação
 let currentUser = null;
 let isPrivacyActive = false;
 let isAdminUnlocked = false; // Controle de acesso em memória aos logs de auditoria
 let adminPinMode = 'verify'; // 'verify' | 'setup' | 'change'
+let brandClickCount = 0;
+let brandClickTimer = null;
 let currentFinanceData = {
     salary: 0,
     debt: 0,
     deadline: '',
     essentials: 0
 };
+
+/**
+ * Verifica se o usuário atual é o administrador do sistema
+ */
+function isCurrentUserAdmin() {
+    if (isAdminUnlocked) return true;
+    if (!currentUser || !currentUser.email) return false;
+
+    const userEmail = currentUser.email.toLowerCase().trim();
+    const adminList = [DEFAULT_ADMIN_EMAIL.toLowerCase()];
+
+    const customAdmin = localStorage.getItem(STORAGE_KEYS.ADMIN_EMAIL);
+    if (customAdmin) {
+        adminList.push(customAdmin.toLowerCase().trim());
+    }
+
+    return adminList.includes(userEmail);
+}
+
+/**
+ * Atualiza a visibilidade dos botões de auditoria.
+ * Totalmente invisível para qualquer visitante ou usuário comum.
+ */
+function updateAdminVisibility() {
+    const isAdm = isCurrentUserAdmin();
+    const auditNavBtn = document.getElementById('auditNavBtn');
+    const auditGreetingBtn = document.getElementById('auditGreetingBtn');
+
+    if (auditNavBtn) {
+        if (isAdm) {
+            auditNavBtn.classList.remove('hidden');
+        } else {
+            auditNavBtn.classList.add('hidden');
+        }
+    }
+
+    if (auditGreetingBtn) {
+        if (isAdm) {
+            auditGreetingBtn.classList.remove('hidden');
+        } else {
+            auditGreetingBtn.classList.add('hidden');
+        }
+    }
+}
+
+/**
+ * Gatilho secreto: 5 cliques rápidos no logo 'Gastei & Agora?' ativam o desafio de administrador
+ */
+function handleBrandSecretClick() {
+    brandClickCount++;
+    clearTimeout(brandClickTimer);
+    brandClickTimer = setTimeout(() => { brandClickCount = 0; }, 2500);
+
+    if (brandClickCount >= 5) {
+        brandClickCount = 0;
+        triggerAdminSecretChallenge();
+    }
+}
+
+/**
+ * Aciona o modal de identificação do administrador
+ */
+function triggerAdminSecretChallenge() {
+    openAdminPinModal('verify');
+}
 
 // Estado do Calendário de Pagamentos
 let calendarState = {
@@ -51,6 +123,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupDateConstraints();
     setupPrivacyTouchSupport();
     startMachineClock();
+    updateAdminVisibility();
 
     // Configura o ouvinte oficial reativo do Supabase Auth
     await setupAuthListener();
@@ -743,12 +816,17 @@ function handleBackdropClick(event) {
     }
 }
 
-// Fechar com tecla ESC
+// Fechar com tecla ESC & Atalho secreto do Administrador (Ctrl + Shift + L)
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeAuthModal();
         closeAuditModal();
         closeAdminPinModal();
+    }
+    // Atalho secreto do Administrador (Ctrl + Shift + L)
+    if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+        e.preventDefault();
+        triggerAdminSecretChallenge();
     }
 });
 
@@ -770,12 +848,16 @@ function renderAppForAuthenticatedUser() {
     if (nameDisplay) nameDisplay.textContent = currentUser.name;
     if (salutationName) salutationName.textContent = currentUser.name;
 
+    // Atualiza visibilidade dos recursos de administrador
+    updateAdminVisibility();
+
     // Carregar dados financeiros salvos do usuário
     loadUserFinanceData();
 }
 
 function renderAppForGuest() {
     closeAuthModal();
+    isAdminUnlocked = false;
     const landing = document.getElementById('homeLandingSection');
     const dashboard = document.getElementById('dashboardSection');
     const userPill = document.getElementById('userPill');
@@ -785,6 +867,9 @@ function renderAppForGuest() {
     if (dashboard) dashboard.classList.add('hidden');
     if (userPill) userPill.classList.add('hidden');
     if (loginNavBtn) loginNavBtn.classList.remove('hidden');
+
+    // Oculta completamente quaisquer botões de auditoria
+    updateAdminVisibility();
 
     // Reseta todos os dados e inputs para evitar qualquer resquício
     currentFinanceData = { salary: 0, debt: 0, deadline: '', essentials: 0 };
@@ -1957,11 +2042,11 @@ async function verifyAuditLogsIntegrity() {
 }
 
 /**
- * Abre o modal de auditoria e renderiza os logs (exclusivo para quem possui PIN)
+ * Abre o modal de auditoria e renderiza os logs (exclusivo para o administrador)
  */
 async function openAuditModal() {
-    if (!isAdminUnlocked) {
-        openAdminPinModal('verify');
+    if (!isCurrentUserAdmin()) {
+        showFeedback('Acesso negado: Este recurso é restrito exclusivamente ao administrador.', 'error');
         return;
     }
     const modal = document.getElementById('auditModal');
@@ -1998,13 +2083,13 @@ async function renderAuditLogsList() {
 
     if (!container) return;
 
-    // Proteção de acesso: se não estiver desbloqueado, não exibe os dados
-    if (!isAdminUnlocked) {
+    // Proteção de acesso: se não for administrador, não exibe os dados
+    if (!isCurrentUserAdmin()) {
         container.innerHTML = `
             <div class="empty-audit-hint" style="color: var(--danger-color, #ef4444); text-align: center; padding: 2rem 1rem;">
                 <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔒</div>
                 <p style="font-weight: 700; margin-bottom: 0.25rem;">Acesso Restrito ao Administrador</p>
-                <small>Desbloqueie o acesso informando seu PIN secreto para visualizar o histórico de auditoria.</small>
+                <small>Apenas o proprietário do site possui autorização para visualizar o histórico de auditoria.</small>
             </div>
         `;
         return;
@@ -2095,8 +2180,8 @@ async function renderAuditLogsList() {
  * Exporta o histórico completo de auditoria em arquivo JSON
  */
 function exportAuditLogs() {
-    if (!isAdminUnlocked) {
-        showFeedback('Acesso negado: Desbloqueie com o PIN de administrador primeiro.', 'error');
+    if (!isCurrentUserAdmin()) {
+        showFeedback('Acesso negado: Exclusivo ao administrador do sistema.', 'error');
         return;
     }
 
@@ -2104,7 +2189,7 @@ function exportAuditLogs() {
     const payload = {
         sistema: 'Gastei & Agora? - Relatório Oficial de Auditoria e Atividades',
         geradoEm: new Date().toISOString(),
-        geradoPor: currentUser ? currentUser.email : 'Visitante',
+        geradoPor: currentUser ? currentUser.email : 'Administrador',
         totalAtividades: logs.length,
         registros: logs
     };
@@ -2125,8 +2210,8 @@ function exportAuditLogs() {
  * Limpa os logs locais após confirmação e registra a ação de limpeza
  */
 async function clearAuditLogs() {
-    if (!isAdminUnlocked) {
-        showFeedback('Acesso negado: Desbloqueie com o PIN de administrador primeiro.', 'error');
+    if (!isCurrentUserAdmin()) {
+        showFeedback('Acesso negado: Exclusivo ao administrador do sistema.', 'error');
         return;
     }
 
@@ -2135,7 +2220,7 @@ async function clearAuditLogs() {
     }
 
     localStorage.removeItem(STORAGE_KEYS.AUDIT_LOGS);
-    await logActivity('LOGS_CLEARED', `Histórico local de auditoria foi limpo por ${currentUser?.email || 'Visitante'}`, {});
+    await logActivity('LOGS_CLEARED', `Histórico local de auditoria foi limpo por ${currentUser?.email || 'Administrador'}`, {});
     await renderAuditLogsList();
 }
 
@@ -2150,17 +2235,10 @@ async function hashAdminPin(pin) {
 }
 
 /**
- * Abre o modal de PIN do administrador ('setup', 'verify' ou 'change')
+ * Abre o modal de PIN/Chave do administrador ('verify' ou 'change')
  */
 function openAdminPinModal(mode = 'verify') {
-    const savedPinHash = localStorage.getItem(STORAGE_KEYS.ADMIN_PIN_HASH);
-
-    // Se ainda não houver PIN configurado, força o modo de configuração inicial
-    if (!savedPinHash) {
-        adminPinMode = 'setup';
-    } else {
-        adminPinMode = mode;
-    }
+    adminPinMode = mode;
 
     const modal = document.getElementById('adminPinModal');
     const titleEl = document.getElementById('adminPinModalTitle');
@@ -2182,17 +2260,9 @@ function openAdminPinModal(mode = 'verify') {
     if (pinOldInput) pinOldInput.value = '';
     if (pinConfirmInput) pinConfirmInput.value = '';
 
-    if (adminPinMode === 'setup') {
-        if (titleEl) titleEl.textContent = 'Configurar PIN de Administrador';
-        if (subtitleEl) subtitleEl.textContent = 'Crie um PIN secreto (4 a 8 dígitos) para garantir que apenas você acesse os logs.';
-        if (oldGroup) oldGroup.classList.add('hidden');
-        if (confirmGroup) confirmGroup.classList.remove('hidden');
-        if (inputLabel) inputLabel.textContent = 'Novo PIN Secreto';
-        if (inputHint) inputHint.textContent = 'Defina um código numérico ou senha que você lembre com facilidade.';
-        if (submitBtn) submitBtn.innerHTML = '<span>Salvar PIN e Desbloquear</span>';
-    } else if (adminPinMode === 'change') {
-        if (titleEl) titleEl.textContent = 'Alterar PIN de Administrador';
-        if (subtitleEl) subtitleEl.textContent = 'Confirme o PIN atual e defina o novo código de segurança.';
+    if (adminPinMode === 'change') {
+        if (titleEl) titleEl.textContent = 'Alterar PIN do Administrador';
+        if (subtitleEl) subtitleEl.textContent = 'Confirme o PIN ou Chave atual e defina o novo código de segurança.';
         if (oldGroup) oldGroup.classList.remove('hidden');
         if (confirmGroup) confirmGroup.classList.remove('hidden');
         if (inputLabel) inputLabel.textContent = 'Novo PIN Secreto';
@@ -2200,13 +2270,13 @@ function openAdminPinModal(mode = 'verify') {
         if (submitBtn) submitBtn.innerHTML = '<span>Atualizar PIN</span>';
     } else {
         // verify
-        if (titleEl) titleEl.textContent = 'Acesso Restrito ao Administrador';
-        if (subtitleEl) subtitleEl.textContent = 'Insira seu PIN secreto para visualizar o histórico de atividades e auditoria do site.';
+        if (titleEl) titleEl.textContent = 'Acesso Exclusivo ao Administrador';
+        if (subtitleEl) subtitleEl.textContent = 'Insira a Chave Mestra ou o PIN do Administrador para desbloquear o acesso.';
         if (oldGroup) oldGroup.classList.add('hidden');
         if (confirmGroup) confirmGroup.classList.add('hidden');
-        if (inputLabel) inputLabel.textContent = 'PIN Secreto';
-        if (inputHint) inputHint.textContent = 'Apenas quem tiver esse PIN poderá abrir o log de auditoria.';
-        if (submitBtn) submitBtn.innerHTML = '<span>Desbloquear Auditoria</span>';
+        if (inputLabel) inputLabel.textContent = 'Chave Mestra ou PIN';
+        if (inputHint) inputHint.textContent = 'Apenas o proprietário do site possui este código de acesso.';
+        if (submitBtn) submitBtn.innerHTML = '<span>Desbloquear Painel</span>';
     }
 
     if (modal) {
@@ -2239,12 +2309,13 @@ function handleAdminPinBackdropClick(event) {
 }
 
 /**
- * Bloqueia o acesso de administrador imediatamente
+ * Bloqueia o acesso de administrador imediatamente e oculta os botões
  */
 function lockAdminAccess() {
     isAdminUnlocked = false;
     closeAuditModal();
-    showFeedback('🔒 Acesso administrativo bloqueado com sucesso.', 'info');
+    updateAdminVisibility();
+    showFeedback('🔒 Painel administrativo bloqueado com segurança.', 'info');
 }
 
 /**
@@ -2256,7 +2327,7 @@ function promptChangeAdminPin() {
 }
 
 /**
- * Processa a validação, definição ou alteração do PIN do administrador
+ * Processa a validação da Chave Mestra ou PIN do administrador
  */
 async function handleVerifyAdminPin(event) {
     event.preventDefault();
@@ -2288,40 +2359,18 @@ async function handleVerifyAdminPin(event) {
     const confirmPin = pinConfirmInput ? pinConfirmInput.value.trim() : '';
     const savedPinHash = localStorage.getItem(STORAGE_KEYS.ADMIN_PIN_HASH);
 
-    if (adminPinMode === 'setup') {
-        if (!pin || pin.length < 4) {
-            showError('O PIN deve ter no mínimo 4 dígitos ou caracteres.');
-            return;
-        }
-        if (pin !== confirmPin) {
-            showError('A confirmação do PIN não confere com o PIN informado.');
-            return;
-        }
-
-        const hashed = await hashAdminPin(pin);
-        localStorage.setItem(STORAGE_KEYS.ADMIN_PIN_HASH, hashed);
-        isAdminUnlocked = true;
-
-        showSuccess('PIN configurado com sucesso! Abrindo auditoria...');
-        await logActivity('SECURITY_ALERT', 'PIN de Administrador configurado com sucesso pela primeira vez.', {});
-
-        setTimeout(async () => {
-            closeAdminPinModal();
-            const modal = document.getElementById('auditModal');
-            if (modal) modal.classList.remove('hidden');
-            await renderAuditLogsList();
-            showFeedback('🎉 PIN de Administrador ativo! O log agora é exclusivo seu.', 'success');
-        }, 500);
-
-    } else if (adminPinMode === 'change') {
+    if (adminPinMode === 'change') {
         if (!oldPin) {
-            showError('Por favor, informe seu PIN atual.');
+            showError('Por favor, informe a Chave ou PIN atual.');
             return;
         }
         const oldHashed = await hashAdminPin(oldPin);
-        if (oldHashed !== savedPinHash) {
-            showError('PIN atual incorreto.');
-            await logActivity('SECURITY_ALERT', 'Tentativa de alteração de PIN rejeitada (PIN atual incorreto).', {});
+        const isMaster = MASTER_ADMIN_KEYS.map(k => k.toLowerCase()).includes(oldPin.toLowerCase());
+        const isHashMatch = savedPinHash && (oldHashed === savedPinHash);
+
+        if (!isMaster && !isHashMatch) {
+            showError('Chave atual incorreta.');
+            await logActivity('SECURITY_ALERT', 'Tentativa de alteração de PIN rejeitada (chave incorreta).', {});
             return;
         }
         if (!pin || pin.length < 4) {
@@ -2342,6 +2391,7 @@ async function handleVerifyAdminPin(event) {
 
         setTimeout(async () => {
             closeAdminPinModal();
+            updateAdminVisibility();
             const modal = document.getElementById('auditModal');
             if (modal) modal.classList.remove('hidden');
             await renderAuditLogsList();
@@ -2351,25 +2401,36 @@ async function handleVerifyAdminPin(event) {
     } else {
         // Mode 'verify'
         if (!pin) {
-            showError('Por favor, digite seu PIN.');
+            showError('Por favor, digite a Chave Mestra ou seu PIN.');
             return;
         }
 
         const hashed = await hashAdminPin(pin);
-        if (hashed === savedPinHash) {
+        const isMaster = MASTER_ADMIN_KEYS.map(k => k.toLowerCase()).includes(pin.toLowerCase());
+        const isHashMatch = savedPinHash && (hashed === savedPinHash);
+
+        if (isMaster || isHashMatch) {
             isAdminUnlocked = true;
-            showSuccess('PIN verificado com sucesso!');
-            await logActivity('AUTH_LOGIN', 'Acesso aos logs de auditoria desbloqueado com PIN de administrador.', {});
+
+            // Se logado, vincula a conta como administradora permanente
+            if (currentUser && currentUser.email) {
+                localStorage.setItem(STORAGE_KEYS.ADMIN_EMAIL, currentUser.email.toLowerCase().trim());
+            }
+
+            updateAdminVisibility();
+            showSuccess('Acesso de Administrador confirmado!');
+            await logActivity('AUTH_LOGIN', `Acesso administrativo desbloqueado para ${currentUser?.email || 'Proprietário'}`, {});
 
             setTimeout(async () => {
                 closeAdminPinModal();
                 const modal = document.getElementById('auditModal');
                 if (modal) modal.classList.remove('hidden');
                 await renderAuditLogsList();
+                showFeedback('👑 Modo Administrador ativo!', 'success');
             }, 300);
         } else {
-            showError('PIN incorreto. Apenas o administrador possui este acesso.');
-            await logActivity('SECURITY_ALERT', 'Tentativa de acesso não autorizado aos logs com PIN incorreto.', {});
+            showError('Chave ou PIN incorreto. Apenas o administrador possui este acesso.');
+            await logActivity('SECURITY_ALERT', 'Tentativa de acesso não autorizado aos logs com chave incorreta.', {});
         }
     }
 }
