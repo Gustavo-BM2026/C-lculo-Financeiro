@@ -69,6 +69,12 @@
                     <span class="nav-text">Notificações</span>
                 </button>
 
+                <!-- Botão de Instalar / Baixar Aplicativo para Computador -->
+                <button id="installAppNavBtn" class="btn-icon install-pwa-btn hidden" aria-label="Baixar aplicativo para computador" title="Baixar aplicativo no seu computador (PWA)" onclick="triggerPWAInstall()">
+                    <span class="nav-icon">💻</span>
+                    <span class="nav-text">Baixar App</span>
+                </button>
+
                 <!-- Botão de Auditoria / Logs (Restrito ao Administrador - Oculto por padrão para visitantes e outros usuários) -->
                 <button id="auditNavBtn" class="btn-icon hidden" aria-label="Histórico de alterações e auditoria do administrador" title="Logs de Auditoria (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
                     <span class="nav-icon">🔒</span>
@@ -481,6 +487,12 @@
                         <span class="notif-text">Notificações</span>
                     </button>
 
+                    <!-- Botão de Baixar App Desktop -->
+                    <button id="installAppGreetingBtn" class="btn-icon install-pwa-btn hidden" aria-label="Baixar aplicativo para computador" title="Baixar aplicativo no seu computador (PWA)" onclick="triggerPWAInstall()">
+                        <span class="install-icon">💻</span>
+                        <span class="install-text">Baixar App PC</span>
+                    </button>
+
                     <!-- Botão de Auditoria / Logs (Restrito ao Administrador - Oculto por padrão) -->
                     <button id="auditGreetingBtn" class="btn-icon hidden" aria-label="Histórico de alterações e auditoria do administrador" title="Registro de Atividades (Acesso Restrito ao Administrador)" onclick="openAuditModal()">
                         <span class="audit-icon">🔒</span>
@@ -491,6 +503,24 @@
                         <span class="status-indicator"></span>
                         <span id="debtHealthText">Aguardando dados...</span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Banner de Onboarding para Usuários do App Desktop / PWA -->
+            <div id="desktopPwaBanner" class="desktop-pwa-banner hidden">
+                <div class="desktop-banner-content">
+                    <span class="desktop-banner-badge">💻 App para Computador</span>
+                    <p id="desktopBannerMessage">
+                        Receba lembretes de metas e contas diretamente na sua Área de Trabalho e na Central de Notificações do Windows!
+                    </p>
+                </div>
+                <div class="desktop-banner-actions">
+                    <button type="button" class="btn btn-primary btn-xs" id="desktopBannerBtn" onclick="handleNotificationButtonClick()">
+                        🔔 Ativar Notificações Push
+                    </button>
+                    <button type="button" class="btn-close-banner" onclick="dismissDesktopBanner()" title="Fechar aviso">
+                        ✕
+                    </button>
                 </div>
             </div>
 

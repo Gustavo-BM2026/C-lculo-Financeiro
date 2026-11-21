@@ -127,6 +127,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateAdminVisibility();
     initServiceWorker();
     setupNetworkStatusListeners();
+    initPwaInstallManager();
+    checkDesktopPwaStatus();
+    setupBackgroundNotificationListener();
 
     // Configura o ouvinte oficial reativo do Supabase Auth
     await setupAuthListener();
@@ -2810,4 +2813,195 @@ function closeInAppNotificationFallback() {
         toast.classList.add('hidden');
         toast.classList.remove('hiding');
     }, 300);
+}
+
+/* ============================================================================
+   10. INSTALAÇÃO PWA NO COMPUTADOR & NOTIFICAÇÕES DESKTOP PUSH
+   ============================================================================ */
+
+let deferredInstallPrompt = null;
+
+function initPwaInstallManager() {
+    // Intercepta o evento de instalação do PWA no computador
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+
+        // Exibe os botões de baixar o aplicativo para computador
+        const navBtn = document.getElementById('installAppNavBtn');
+        const greetingBtn = document.getElementById('installAppGreetingBtn');
+        if (navBtn) navBtn.classList.remove('hidden');
+        if (greetingBtn) greetingBtn.classList.remove('hidden');
+    });
+
+    // Detecta quando o usuário conclui o download / instalação do app no computador
+    window.addEventListener('appinstalled', async (evt) => {
+        deferredInstallPrompt = null;
+
+        // Oculta os botões de instalação
+        const navBtn = document.getElementById('installAppNavBtn');
+        const greetingBtn = document.getElementById('installAppGreetingBtn');
+        if (navBtn) navBtn.classList.add('hidden');
+        if (greetingBtn) greetingBtn.classList.add('hidden');
+
+        await logActivity('APP_INSTALLED', 'Aplicativo instalado no computador com sucesso pelo usuário.', {});
+
+        // Dispara ou convida para notificações push nativas do desktop
+        if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+                await triggerDesktopInstalledNotification();
+                showFeedback('💻 Aplicativo instalado no computador! Notificações push ativas.', 'success');
+            } else if (Notification.permission === 'default') {
+                // Abre o modal explicando as notificações na Área de Trabalho do Windows
+                setTimeout(() => {
+                    openNotificationExplanationModal('default');
+                }, 1000);
+            }
+        }
+    });
+}
+
+/**
+ * Disparador manual para baixar / instalar o aplicativo no computador
+ */
+async function triggerPWAInstall() {
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const choiceResult = await deferredInstallPrompt.userChoice;
+        if (choiceResult && choiceResult.outcome === 'accepted') {
+            await logActivity('PWA_INSTALL_ACCEPTED', 'Usuário aceitou baixar e instalar o aplicativo no computador.', {});
+        } else {
+            await logActivity('PWA_INSTALL_DISMISSED', 'Usuário cancelou a instalação do aplicativo no computador.', {});
+        }
+        deferredInstallPrompt = null;
+    } else {
+        // Se o navegador já instalou ou não deu suporte direto via script
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        if (isStandalone) {
+            showFeedback('💻 O aplicativo já está instalado no seu computador!', 'info');
+        } else {
+            showInAppNotificationFallback(
+                'Como Baixar para o Computador',
+                'No Chrome ou Edge, clique no ícone 💻 ou ⬇️ ao lado da barra de endereço ou no menu (três pontos) ➜ "Instalar Gastei & Agora?".'
+            );
+        }
+    }
+}
+
+/**
+ * Notificação push oficial de confirmação de instalação no computador
+ */
+async function triggerDesktopInstalledNotification() {
+    const title = '🎉 Gastei & Agora? Instalado no Computador!';
+    const options = {
+        body: 'O aplicativo agora está na sua Área de Trabalho e Barra de Tarefas. Você receberá alertas push de suas metas financeiras!',
+        icon: 'icons/icon-192.png',
+        badge: 'icons/favicon.svg',
+        vibrate: [200, 100, 200],
+        tag: 'gastei-agora-desktop-installed',
+        renotify: true,
+        requireInteraction: true, // Mantém na central de notificações do Windows até o usuário interagir
+        data: { url: './' },
+        actions: [
+            { action: 'open', title: 'Abrir App' },
+            { action: 'dismiss', title: 'Dispensar' }
+        ]
+    };
+
+    if ('serviceWorker' in navigator) {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            if (reg && typeof reg.showNotification === 'function') {
+                await reg.showNotification(title, options);
+                return;
+            }
+        } catch (e) {
+            console.warn('Erro ao disparar via SW:', e);
+        }
+    }
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            new Notification(title, options);
+            return;
+        } catch (e) {
+            console.warn('Erro ao disparar Notification nativa:', e);
+        }
+    }
+
+    showInAppNotificationFallback(title, options.body);
+}
+
+/**
+ * Detecta se está executando como aplicativo desktop instalado (standalone)
+ */
+function checkDesktopPwaStatus() {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    const isDesktop = !(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+
+    if (isStandalone && isDesktop) {
+        document.body.classList.add('pwa-desktop-standalone');
+
+        // Se notificações ainda não foram concedidas, exibe o banner de onboarding desktop
+        if ('Notification' in window && Notification.permission === 'default') {
+            const dismissed = localStorage.getItem('gastei_desktop_banner_dismissed');
+            if (!dismissed) {
+                const banner = document.getElementById('desktopPwaBanner');
+                if (banner) banner.classList.remove('hidden');
+            }
+        }
+    }
+}
+
+function dismissDesktopBanner() {
+    const banner = document.getElementById('desktopPwaBanner');
+    if (banner) banner.classList.add('hidden');
+    localStorage.setItem('gastei_desktop_banner_dismissed', 'true');
+}
+
+/**
+ * Monitora quando o usuário abaixa / minimiza a janela do aplicativo para segundo plano
+ */
+function setupBackgroundNotificationListener() {
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            handleAppBackgrounded();
+        }
+    });
+}
+
+function handleAppBackgrounded() {
+    // Verifica se notificações estão concedidas
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    // Trava de frequência: no máximo 1 notificação em segundo plano a cada 12 horas
+    const LAST_BG_KEY = 'gastei_last_bg_notif_time';
+    const now = Date.now();
+    const lastSent = parseInt(localStorage.getItem(LAST_BG_KEY) || '0', 10);
+    const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+    if (now - lastSent < TWELVE_HOURS) return;
+
+    const { debt, deadline } = currentFinanceData;
+    if (debt > 0 && deadline) {
+        localStorage.setItem(LAST_BG_KEY, String(now));
+
+        const title = '💡 Gastei & Agora? — Ativo em Segundo Plano';
+        const options = {
+            body: `Suas metas financeiras continuam monitoradas na Área de Trabalho enquanto a janela estiver minimizada!`,
+            icon: 'icons/icon-192.png',
+            badge: 'icons/favicon.svg',
+            tag: 'gastei-agora-bg-notif',
+            renotify: false,
+            data: { url: './' }
+        };
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then((reg) => {
+                if (reg && typeof reg.showNotification === 'function') {
+                    reg.showNotification(title, options);
+                }
+            }).catch(() => {});
+        }
+    }
 }

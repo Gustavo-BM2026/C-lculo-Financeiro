@@ -9,7 +9,7 @@
  * - Fallback inteligente para offline.html quando sem conexão
  */
 
-const CACHE_NAME = 'gastei-agora-v4';
+const CACHE_NAME = 'gastei-agora-v5';
 
 // Recursos essenciais para pré-cache imediato
 const PRECACHE_ASSETS = [
@@ -131,9 +131,15 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-// Interceptação de clique na notificação nativa
+// Interceptação de clique na notificação nativa (Windows, Desktop e Mobile)
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
+
+    // Se o usuário clicou no botão "Fechar / Dispensar"
+    if (event.action === 'dismiss') {
+        return;
+    }
+
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             // Se houver uma aba/janela já aberta, foca nela
@@ -147,6 +153,44 @@ self.addEventListener('notificationclick', (event) => {
                 return clients.openWindow('./');
             }
         })
+    );
+});
+
+// Suporte a Push Notifications remotas / em segundo plano no Computador
+self.addEventListener('push', (event) => {
+    let data = {
+        title: '🔔 Gastei & Agora? — Lembrete de Metas',
+        body: 'Você tem atualizações financeiras pendentes no seu aplicativo.',
+        icon: 'icons/icon-192.png',
+        badge: 'icons/favicon.svg',
+        tag: 'gastei-agora-push-notif'
+    };
+
+    if (event.data) {
+        try {
+            const parsed = event.data.json();
+            data = { ...data, ...parsed };
+        } catch (e) {
+            data.body = event.data.text();
+        }
+    }
+
+    const options = {
+        body: data.body,
+        icon: data.icon || 'icons/icon-192.png',
+        badge: data.badge || 'icons/favicon.svg',
+        vibrate: [150, 50, 150],
+        tag: data.tag || 'gastei-agora-push-notif',
+        renotify: true,
+        data: { url: data.url || './' },
+        actions: [
+            { action: 'open', title: 'Abrir App' },
+            { action: 'dismiss', title: 'Dispensar' }
+        ]
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title, options)
     );
 });
 
