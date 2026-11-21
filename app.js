@@ -392,17 +392,21 @@ function setupPrivacyTouchSupport() {
     });
 }
 
-// Configura data mínima para o input do calendário (a partir de hoje) e ouvinte de atualização
+// Configura data mínima para o input do calendário (a partir de hoje) e sincroniza com o computador
 function setupDateConstraints() {
     const deadlineInput = document.getElementById('debtDeadline');
     if (deadlineInput) {
         const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        deadlineInput.min = `${yyyy}-${mm}-${dd}`;
+        const todayStr = toISODateString(today);
+        deadlineInput.min = todayStr;
 
-        // Sincroniza dinamicamente o calendário ao alterar a data no campo
+        // Se o campo ainda não tiver valor, ou estiver com o valor antigo artificial (2027-05-21), sincroniza com a máquina
+        if (!deadlineInput.value || deadlineInput.value === '2027-05-21') {
+            deadlineInput.value = todayStr;
+            currentFinanceData.deadline = todayStr;
+        }
+
+        // Sincroniza dinamicamente o calendário e métricas ao alterar a data no campo
         deadlineInput.addEventListener('change', (e) => {
             const val = e.target.value;
             if (val) {
@@ -414,6 +418,7 @@ function setupDateConstraints() {
                 calendarState.selectedDateStr = val;
                 renderCalendarGrid();
                 renderSelectedDateNotes();
+                calculateAndRenderMetrics();
             }
         });
     }
@@ -964,6 +969,12 @@ async function loadUserFinanceData() {
                     essentials: parseFloat(data.essential_expenses) || 0,
                     updatedAt: data.updated_at
                 };
+
+                // Se o valor cadastrado for o default antigo artificial (2027-05-21) ou vazio, sincroniza com o computador
+                if (!currentFinanceData.deadline || currentFinanceData.deadline === '2027-05-21') {
+                    currentFinanceData.deadline = toISODateString(new Date());
+                }
+
                 document.getElementById('monthlySalary').value = currentFinanceData.salary || '';
                 document.getElementById('totalDebt').value = currentFinanceData.debt || '';
                 document.getElementById('debtDeadline').value = currentFinanceData.deadline || '';
@@ -987,6 +998,12 @@ async function loadUserFinanceData() {
         if (raw) {
             try {
                 currentFinanceData = JSON.parse(raw);
+
+                // Se o valor salvo for o default antigo artificial (2027-05-21) ou vazio, sincroniza com o computador
+                if (!currentFinanceData.deadline || currentFinanceData.deadline === '2027-05-21') {
+                    currentFinanceData.deadline = toISODateString(new Date());
+                }
+
                 document.getElementById('monthlySalary').value = currentFinanceData.salary || '';
                 document.getElementById('totalDebt').value = currentFinanceData.debt || '';
                 document.getElementById('debtDeadline').value = currentFinanceData.deadline || '';
@@ -999,7 +1016,7 @@ async function loadUserFinanceData() {
         }
     }
 
-    // 3. Se for um usuário novo (sem dados salvos no Supabase nem no LocalStorage), reseta todos os campos
+    // 3. Se for um usuário novo (sem dados salvos no Supabase nem no LocalStorage), sincroniza com a data do computador
     if (!loaded) {
         currentFinanceData = {
             salary: 0,
@@ -1011,15 +1028,10 @@ async function loadUserFinanceData() {
         document.getElementById('totalDebt').value = '';
         document.getElementById('essentialExpenses').value = '';
 
-        // Preenche com uma deadline padrão (ex: daqui a 6 meses) para guiar o usuário
-        const defaultDeadline = new Date();
-        defaultDeadline.setMonth(defaultDeadline.getMonth() + 6);
-        const yyyy = defaultDeadline.getFullYear();
-        const mm = String(defaultDeadline.getMonth() + 1).padStart(2, '0');
-        const dd = String(defaultDeadline.getDate()).padStart(2, '0');
-        const defaultDeadlineStr = `${yyyy}-${mm}-${dd}`;
-        document.getElementById('debtDeadline').value = defaultDeadlineStr;
-        currentFinanceData.deadline = defaultDeadlineStr;
+        // Sincroniza o deadline diretamente com a data atual da máquina (Hoje)
+        const todayStr = toISODateString(new Date());
+        document.getElementById('debtDeadline').value = todayStr;
+        currentFinanceData.deadline = todayStr;
 
         calculateAndRenderMetrics();
     }
@@ -1161,12 +1173,12 @@ function calculateAndRenderMetrics() {
     const diffTime = targetDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays <= 0) {
-        metricTimeRemaining.textContent = 'Vencido hoje ou no passado!';
+    if (diffDays < 0) {
+        metricTimeRemaining.textContent = 'Data no passado!';
         metricTimeRemaining.classList.add('text-danger');
         feasibilityBox.className = 'feasibility-box danger';
-        feasibilityTitle.textContent = '⚠️ Deadline Ultrapassado';
-        feasibilityMessage.textContent = 'A data escolhida já chegou ou passou. Selecione uma data futura para podermos distribuir suas parcelas de pagamento.';
+        feasibilityTitle.textContent = '⚠️ Prazo Ultrapassado';
+        feasibilityMessage.textContent = 'A data escolhida já passou. Selecione a data de hoje ou uma data futura para calcular suas metas.';
         debtHealthBadge.className = 'status-chip critical';
         debtHealthText.textContent = 'Prazo Vencido';
         progressBar.style.width = '100%';
@@ -1175,22 +1187,26 @@ function calculateAndRenderMetrics() {
 
     metricTimeRemaining.classList.remove('text-danger');
 
-    // Cálculo de meses aproximados (dias / 30.41)
-    const approxMonths = Math.max(diffDays / 30.41, 0.5);
+    // Se o prazo for hoje: meta para o dia atual (quitação para hoje)
+    const isToday = (diffDays === 0);
+    const calcDays = Math.max(diffDays, 1);
+    const approxMonths = Math.max(diffDays / 30.41, 1);
     const monthsRounded = Math.ceil(approxMonths);
 
     // Texto de tempo restante
-    if (diffDays < 30) {
+    if (isToday) {
+        metricTimeRemaining.textContent = 'Hoje (Quitação para hoje)';
+    } else if (diffDays < 30) {
         metricTimeRemaining.textContent = `${diffDays} dia(s)`;
     } else {
         metricTimeRemaining.textContent = `${diffDays} dias (~${monthsRounded} meses)`;
     }
 
     // Metas de economia
-    const monthlyPayment = debt / approxMonths;
-    const dailyPayment = debt / diffDays;
+    const monthlyPayment = isToday ? debt : (debt / (diffDays / 30.41 || 1));
+    const dailyPayment = debt / calcDays;
 
-    metricMonthlyTarget.textContent = formatCurrency(monthlyPayment) + ' / mês';
+    metricMonthlyTarget.textContent = formatCurrency(monthlyPayment) + (isToday ? ' (total hoje)' : ' / mês');
     metricDailyTarget.textContent = formatCurrency(dailyPayment) + ' / dia';
 
     // % do salário
@@ -1204,7 +1220,7 @@ function calculateAndRenderMetrics() {
 
     // Progresso temporal (estimativa com base em 1 ano padrão)
     const maxReferenceDays = 365;
-    const progressPct = Math.min(Math.max((diffDays / maxReferenceDays) * 100, 10), 100);
+    const progressPct = isToday ? 100 : Math.min(Math.max((diffDays / maxReferenceDays) * 100, 10), 100);
     progressBar.style.width = `${progressPct}%`;
 
     // Avaliação de Viabilidade Financeira
@@ -1220,6 +1236,20 @@ function calculateAndRenderMetrics() {
         feasibilityMessage.textContent = 'Para sabermos se essa meta de pagamento é sustentável, informe o quanto você recebe por mês no formulário.';
         debtHealthBadge.className = 'status-chip moderate';
         debtHealthText.textContent = 'Renda não informada';
+    } else if (isToday) {
+        if (salary >= debt) {
+            feasibilityBox.className = 'feasibility-box success';
+            feasibilityTitle.textContent = '🟢 Quitação Total para Hoje!';
+            feasibilityMessage.innerHTML = `Sua renda cobre o valor integral da dívida de <span class="privacy-value" title="Passe o mouse para revelar">${formatCurrency(debt)}</span>. Você pode quitar tudo hoje mesmo (${formatDateBR(targetDate)})!`;
+            debtHealthBadge.className = 'status-chip healthy';
+            debtHealthText.textContent = 'Quitação Imediata';
+        } else {
+            feasibilityBox.className = 'feasibility-box warning';
+            feasibilityTitle.textContent = '🟡 Meta de Quitação para Hoje';
+            feasibilityMessage.innerHTML = `Para zerar a dívida hoje, você precisará desembolsar o total de <span class="privacy-value" title="Passe o mouse para revelar">${formatCurrency(debt)}</span>. Se preferir parcelar com calma, escolha uma data futura no calendário.`;
+            debtHealthBadge.className = 'status-chip moderate';
+            debtHealthText.textContent = 'Quitação Hoje';
+        }
     } else if (salaryPct <= 25) {
         feasibilityBox.className = 'feasibility-box success';
         feasibilityTitle.textContent = '🟢 Meta Perfeitamente Viável!';
@@ -1261,19 +1291,21 @@ function triggerAutomaticAIDiagnosis() {
     today.setHours(0, 0, 0, 0);
     const [tY, tM, tD] = deadline.split('-').map(Number);
     const targetDate = new Date(tY, tM - 1, tD);
-    const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
-    const approxMonths = Math.max(diffDays / 30.41, 0.5);
-    const monthlyTarget = debt / approxMonths;
+    const rawDiffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.max(rawDiffDays, 0);
+    const safeCalcDays = Math.max(diffDays, 1);
+    const approxMonths = Math.max(diffDays / 30.41, 1);
+    const monthlyTarget = diffDays === 0 ? debt : (debt / approxMonths);
     const salaryPct = salary > 0 ? ((monthlyTarget / salary) * 100) : 0;
     const disposableIncome = salary - essentials;
 
     let diagnosisHtml = `
         <p>📋 <strong>Diagnóstico Completo da FinAI para ${currentUser.name}:</strong></p>
-        <p>Analisando sua dívida de <strong>${formatCurrency(debt, true)}</strong> com prazo limite até <strong>${formatDateBR(targetDate)}</strong> (${diffDays} dias restantes):</p>
+        <p>Analisando sua dívida de <strong>${formatCurrency(debt, true)}</strong> com prazo limite até <strong>${formatDateBR(targetDate)}</strong> (${diffDays === 0 ? 'meta para hoje' : diffDays + ' dias restantes'}):</p>
         
         <ul>
-            <li><strong>Meta de amortização mensal:</strong> ${formatCurrency(monthlyTarget, true)}/mês</li>
-            <li><strong>Esforço diário correspondente:</strong> ${formatCurrency(debt / diffDays, true)}/dia</li>
+            <li><strong>Meta de amortização mensal:</strong> ${formatCurrency(monthlyTarget, true)}${diffDays === 0 ? ' (total hoje)' : '/mês'}</li>
+            <li><strong>Esforço diário correspondente:</strong> ${formatCurrency(debt / safeCalcDays, true)}/dia</li>
             <li><strong>Comprometimento da renda:</strong> ${salary > 0 ? `<span class="privacy-value" title="Passe o mouse para ver">${salaryPct.toFixed(1)}%</span>` : 'Salário não informado'}</li>
         </ul>
     `;
@@ -2009,6 +2041,43 @@ function goToDeadlineCalendar() {
     calendarState.viewYear = y;
     calendarState.viewMonth = m - 1;
     selectCalendarDate(currentFinanceData.deadline);
+}
+
+/**
+ * Sincroniza imediatamente o campo de data e o calendário com o relógio/data do computador (Hoje)
+ */
+function syncDeadlineToToday() {
+    const today = new Date();
+    const todayStr = toISODateString(today);
+    const deadlineInput = document.getElementById('debtDeadline');
+    
+    if (deadlineInput) {
+        deadlineInput.value = todayStr;
+        deadlineInput.min = todayStr;
+    }
+    currentFinanceData.deadline = todayStr;
+
+    // Sincroniza o calendário para o mês/dia atual da máquina
+    calendarState.viewYear = today.getFullYear();
+    calendarState.viewMonth = today.getMonth();
+    calendarState.selectedDateStr = todayStr;
+
+    syncDeadlineWithCalendarNotes();
+    renderCalendarGrid();
+    renderSelectedDateNotes();
+    calculateAndRenderMetrics();
+
+    // Se o usuário estiver logado, atualiza o LocalStorage
+    if (currentUser) {
+        const key = STORAGE_KEYS.FINANCE_DATA + currentUser.id;
+        try {
+            localStorage.setItem(key, JSON.stringify(currentFinanceData));
+        } catch (e) {
+            console.warn('Erro ao salvar finance data no LocalStorage:', e);
+        }
+    }
+
+    showFeedback('📅 Data sincronizada com o calendário do seu computador!', 'success');
 }
 
 /* ============================================================================

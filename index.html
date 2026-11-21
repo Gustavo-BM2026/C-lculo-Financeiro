@@ -531,10 +531,15 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="debtDeadline">
-                                <span>Calendário: Deadline para Quitar</span>
-                                <span class="help-tooltip" title="Escolha a data limite em que você quer estar 100% livre dessa dívida">📅</span>
-                            </label>
+                            <div class="field-header-row">
+                                <label for="debtDeadline">
+                                    <span>Calendário: Deadline para Quitar</span>
+                                    <span class="help-tooltip" title="Escolha a data limite em que você quer estar 100% livre dessa dívida">📅</span>
+                                </label>
+                                <button type="button" class="btn btn-outline btn-xs sync-today-btn" id="btnSyncDeadlineToday" onclick="syncDeadlineToToday()" title="Sincronizar campo com a data de hoje do seu computador">
+                                    📅 Sincronizar com Hoje
+                                </button>
+                            </div>
                             <input type="date" id="debtDeadline" required>
                             <small class="field-hint">Defina até quando você precisa quitar todo esse valor.</small>
                         </div>

@@ -1,6 +1,6 @@
 /**
  * Service Worker Oficial do PWA: Gastei & Agora?
- * Versão do Cache: gastei-agora-v3
+ * Versão do Cache: gastei-agora-v4
  * 
  * Regras de Segurança:
  * - Network-Only para Supabase (*.supabase.co) para preservar integridade de Auth e RLS
@@ -9,7 +9,7 @@
  * - Fallback inteligente para offline.html quando sem conexão
  */
 
-const CACHE_NAME = 'gastei-agora-v3';
+const CACHE_NAME = 'gastei-agora-v4';
 
 // Recursos essenciais para pré-cache imediato
 const PRECACHE_ASSETS = [
